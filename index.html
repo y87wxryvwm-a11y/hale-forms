@@ -39,8 +39,13 @@
   .site-badge {
     display: inline-block; background: var(--accent); color: #fff;
     padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;
-    margin-bottom: 20px;
+    margin-bottom: 8px;
   }
+
+  .elapsed {
+    font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;
+  }
+  .elapsed strong { color: var(--text); font-weight: 600; }
 
   .field { margin-bottom: 16px; }
   .field label {
@@ -90,6 +95,7 @@
     margin-bottom: 8px; box-shadow: var(--shadow);
   }
   .history-item .date { font-weight: 600; font-size: 15px; }
+  .history-item .time { font-size: 13px; color: var(--text-secondary); }
   .history-item .details { font-size: 13px; color: var(--text-secondary); }
   .history-item .dose { font-weight: 600; font-size: 14px; }
   .history-item .note-preview {
@@ -123,6 +129,25 @@ function formatDate(d) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function formatTime(isoString) {
+  if (!isoString) return '';
+  return new Date(isoString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatElapsed(isoString) {
+  if (!isoString) return '';
+  const now = new Date();
+  const last = new Date(isoString);
+  const diffMs = now - last;
+  if (diffMs < 0) return '';
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days === 0) return `${hours}h ago`;
+  if (hours === 0) return `${days}d ago`;
+  return `${days}d ${hours}h ago`;
+}
+
 function nowLocal() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -131,9 +156,12 @@ function nowLocal() {
 
 function render() {
   const d = defaults;
+  const elapsed = d.last_taken_at ? formatElapsed(d.last_taken_at) : null;
+
   document.getElementById('app').innerHTML = `
     <h1>Log Shot</h1>
     <div class="site-badge">Next: ${d.next_site}</div>
+    ${elapsed ? `<div class="elapsed">Last shot: <strong>${elapsed}</strong></div>` : ''}
 
     <form id="form">
       <div class="field">
@@ -167,7 +195,7 @@ function render() {
       ${d.recent_history.map(h => `
         <div class="history-item">
           <div>
-            <div class="date">${formatDate(h.date)}</div>
+            <div class="date">${formatDate(h.date)}${h.taken_at ? ` <span class="time">${formatTime(h.taken_at)}</span>` : ''}</div>
             <div class="details">${h.site || ''}</div>
             ${h.notes ? `<div class="note-preview">${h.notes}</div>` : ''}
           </div>
@@ -206,7 +234,6 @@ async function submit(e) {
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 2000);
 
-    // Reload defaults to show updated history and next site
     const freshResp = await fetch(API + '?json=1');
     defaults = await freshResp.json();
     render();
