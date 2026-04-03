@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Dashboard — Project Hale</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6;
+    --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
+    --radius: 12px; --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --text: #f1f5f9; --text-secondary: #94a3b8; --accent: #60a5fa;
+      --success: #34d399; --warning: #fbbf24; --danger: #f87171;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: env(safe-area-inset-top) 16px 32px;
+    max-width: 420px; margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font-size: 22px; font-weight: 700; margin: 24px 0 4px; }
+  .subtitle { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    margin-bottom: 12px; box-shadow: var(--shadow);
+  }
+  .card-header {
+    font-size: 12px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+  }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .stat-label { font-size: 14px; color: var(--text-secondary); }
+  .stat-value { font-size: 15px; font-weight: 600; }
+  .stat-sub { font-size: 12px; color: var(--text-secondary); margin-top: -2px; margin-bottom: 6px; text-align: right; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+  }
+  .badge.on-track { background: var(--success); color: #fff; }
+  .badge.behind { background: var(--danger); color: #fff; }
+  .badge.stale { background: var(--warning); color: #000; }
+  .badge.fresh { background: var(--success); color: #fff; }
+  .badge.flat { background: var(--border); color: var(--text-secondary); }
+  .badge.up { background: var(--success); color: #fff; }
+  .badge.down { background: var(--warning); color: #000; }
+
+  .goal-item {
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .goal-item:last-child { border-bottom: none; }
+  .goal-top { display: flex; justify-content: space-between; align-items: center; }
+  .goal-label { font-size: 14px; font-weight: 600; }
+  .goal-detail { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+
+  .freshness {
+    display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .freshness-item {
+    font-size: 12px; color: var(--text-secondary);
+  }
+  .freshness-item strong { font-weight: 600; }
+
+  .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+  .refresh-btn {
+    display: block; width: 100%; padding: 12px; margin-top: 8px;
+    font-size: 14px; font-weight: 600; text-align: center;
+    background: var(--surface); color: var(--accent); border: 1px solid var(--border);
+    border-radius: var(--radius); cursor: pointer;
+  }
+  .refresh-btn:active { background: var(--border); }
+</style>
+</head>
+<body>
+<div id="app" class="loading">Loading dashboard...</div>
+
+<script>
+const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/health-mcp';
+
+async function load() {
+  try {
+    const resp = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'get_snapshot', arguments: {} }
+      }),
+    });
+    const json = await resp.json();
+    const text = json.result?.content?.[0]?.text;
+    if (!text) throw new Error('No data');
+    const data = JSON.parse(text);
+    render(data);
+  } catch (e) {
+    document.getElementById('app').innerHTML = '<p>Failed to load dashboard.</p><button class="refresh-btn" onclick="load()">Retry</button>';
+  }
+}
+
+function render(d) {
+  const w = d.weight;
+  const oura = d.oura;
+  const glp1 = d.glp1;
+  const goals = d.goal_proximity || [];
+  const fresh = d._freshness;
+  const ab = d.body_composition?.latest_ab;
+  const bicep = d.body_composition?.latest_bicep;
+  const dexa = d.body_composition?.latest_dexa;
+
+  document.getElementById('app').innerHTML = `
+    <h1>Dashboard</h1>
+    <div class="subtitle">Project Hale — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</div>
+
+    ${w ? `
+    <div class="card">
+      <div class="card-header">Weight</div>
+      <div class="stat-row">
+        <span class="stat-label">Today</span>
+        <span class="stat-value">${w.latest_recorded_lbs} lbs</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Moving avg</span>
+        <span class="stat-value">${w.moving_avg_lbs} lbs</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Weekly rate</span>
+        <span class="stat-value">${w.weekly_rate_lbs} lbs/wk</span>
+      </div>
+      ${w.projection ? `
+      <div class="stat-row">
+        <span class="stat-label">Apr 30 projection</span>
+        <span class="stat-value">${w.projection.projected_at_deadline_lbs} lbs</span>
+      </div>
+      <div class="stat-sub">
+        Target: ${w.projection.target_lbs} lbs
+        <span class="badge ${w.projection.on_track ? 'on-track' : 'behind'}">${w.projection.on_track ? 'On Track' : 'Behind'}</span>
+      </div>
+      ` : ''}
+    </div>
+    ` : ''}
+
+    <div class="card">
+      <div class="card-header">Oura — Today</div>
+      ${oura?.readiness ? `
+      <div class="stat-row">
+        <span class="stat-label">Readiness</span>
+        <span class="stat-value">
+          ${oura.readiness.today_score != null ? oura.readiness.today_score : '—'}
+          <span style="font-weight:400; font-size:13px; color:var(--text-secondary)"> / avg ${oura.readiness.avg_7d}</span>
+          ${oura.readiness.trend ? `<span class="badge ${oura.readiness.trend}">${oura.readiness.trend}</span>` : ''}
+        </span>
+      </div>
+      ` : ''}
+      ${oura?.sleep ? `
+      <div class="stat-row">
+        <span class="stat-label">Sleep</span>
+        <span class="stat-value">
+          ${oura.sleep.today_score != null ? oura.sleep.today_score : '—'}
+          <span style="font-weight:400; font-size:13px; color:var(--text-secondary)"> / avg ${oura.sleep.avg_7d}</span>
+          ${oura.sleep.trend ? `<span class="badge ${oura.sleep.trend}">${oura.sleep.trend}</span>` : ''}
+        </span>
+      </div>
+      ` : ''}
+      ${oura?.workouts_7d ? `
+      <div class="stat-row">
+        <span class="stat-label">Workouts (7d)</span>
+        <span class="stat-value">${oura.workouts_7d.count}</span>
+      </div>
+      ` : ''}
+      ${oura?.readiness?.stale_days > 0 ? `<div class="stat-sub"><span class="badge stale">Stale ${oura.readiness.stale_days}d</span></div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-header">Body Composition</div>
+      ${ab ? `
+      <div class="stat-row">
+        <span class="stat-label">Lower ab</span>
+        <span class="stat-value">${ab.measurement_in}"</span>
+      </div>
+      ${ab.rate_per_week != null ? `<div class="stat-sub">${ab.rate_per_week}"/wk${ab.projection?.on_track != null ? ` <span class="badge ${ab.projection.on_track ? 'on-track' : 'behind'}">${ab.projection.on_track ? 'On Track' : 'Behind'}</span>` : ''}</div>` : ''}
+      ` : ''}
+      ${bicep ? `
+      <div class="stat-row">
+        <span class="stat-label">Bicep</span>
+        <span class="stat-value">${bicep.measurement_in}"</span>
+      </div>
+      ${bicep.rate_per_week != null ? `<div class="stat-sub">${bicep.rate_per_week}"/wk</div>` : ''}
+      ` : ''}
+      ${dexa ? `
+      <div class="stat-row">
+        <span class="stat-label">Last DEXA</span>
+        <span class="stat-value">${Number(dexa.body_fat_pct).toFixed(1)}% BF</span>
+      </div>
+      <div class="stat-sub">${new Date(dexa.scan_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} — ${Number(dexa.lean_mass_lbs).toFixed(0)} lbs lean</div>
+      ` : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-header">GLP-1</div>
+      <div class="stat-row">
+        <span class="stat-label">Dose</span>
+        <span class="stat-value">${glp1?.current_dose_mg ?? '—'} mg</span>
+      </div>
+      ${glp1?.days_on_current_dose != null ? `
+      <div class="stat-row">
+        <span class="stat-label">On this dose</span>
+        <span class="stat-value">${glp1.days_on_current_dose} days</span>
+      </div>
+      ` : ''}
+      ${glp1?.level ? `
+      <div class="stat-row">
+        <span class="stat-label">Est. level today</span>
+        <span class="stat-value">${glp1.level.projected_today_mg ?? glp1.level.avg_level_mg} mg</span>
+      </div>
+      ${glp1.level.stale_days > 0 ? `<div class="stat-sub">Modeled from ${glp1.level.as_of} data <span class="badge stale">${glp1.level.stale_days}d stale</span></div>` : ''}
+      ` : ''}
+      <div class="stat-row">
+        <span class="stat-label">Adherence</span>
+        <span class="stat-value">${glp1?.adherence_pct ?? '—'}%</span>
+      </div>
+    </div>
+
+    ${goals.length > 0 ? `
+    <div class="card">
+      <div class="card-header">Goal Progress</div>
+      ${goals.map(g => `
+        <div class="goal-item">
+          <div class="goal-top">
+            <span class="goal-label">${g.target_label}</span>
+            ${g.on_track != null ? `<span class="badge ${g.on_track ? 'on-track' : 'behind'}">${g.on_track ? 'On Track' : 'Behind'}</span>` : ''}
+          </div>
+          ${g.current != null ? `
+            <div class="goal-detail">
+              Now: ${g.current}${g.metric.includes('lbs') ? ' lbs' : g.metric.includes('pct') ? '%' : '"'}
+              ${g.gap != null ? ` — ${Math.abs(g.gap)} to go` : ''}
+              ${g.projected_date ? ` — est. ${new Date(g.projected_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+            </div>
+          ` : g.note ? `<div class="goal-detail">${g.note}</div>` : ''}
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
+
+    <div class="card">
+      <div class="card-header">Data Freshness</div>
+      <div class="freshness">
+        ${Object.entries(fresh).map(([k, v]) => {
+          const lbl = k.replace(/_/g, ' ');
+          const stale = v.stale_days > 0;
+          return `<div class="freshness-item"><strong>${lbl}:</strong> ${stale ? v.stale_days + 'd ago' : 'today'}</div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <button class="refresh-btn" onclick="load()">Refresh</button>
+  `;
+}
+
+load();
+</script>
+</body>
+</html>
