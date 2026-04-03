@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<title>Body Measurements</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6;
+    --accent-hover: #2563eb; --success: #10b981; --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --text: #f1f5f9; --text-secondary: #94a3b8; --accent: #60a5fa;
+      --accent-hover: #3b82f6; --success: #34d399;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: env(safe-area-inset-top) 16px 32px;
+    max-width: 420px; margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 { font-size: 24px; font-weight: 700; margin: 24px 0 16px; }
+
+  .tabs {
+    display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .tab {
+    padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600;
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--text-secondary);
+    cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+  }
+  .tab.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+
+  .last-info {
+    font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;
+  }
+  .last-info strong { color: var(--text); font-weight: 600; }
+
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .field input {
+    width: 100%; padding: 12px 14px; font-size: 16px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    outline: none; transition: border-color 0.15s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus { border-color: var(--accent); }
+
+  .btn {
+    width: 100%; padding: 14px; font-size: 17px; font-weight: 600;
+    background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn:active { background: var(--accent-hover); transform: scale(0.99); }
+  .btn:disabled { opacity: 0.5; }
+
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--success); color: #fff; padding: 12px 24px;
+    border-radius: var(--radius); font-weight: 600; font-size: 15px;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+
+  .history { margin-top: 32px; }
+  .history h2 {
+    font-size: 14px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+  }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; background: var(--surface); border-radius: var(--radius);
+    margin-bottom: 8px; box-shadow: var(--shadow);
+  }
+  .history-item .date { font-weight: 600; font-size: 15px; }
+  .history-item .value { font-weight: 600; font-size: 15px; }
+  .history-item .delta {
+    font-size: 12px; margin-left: 6px;
+  }
+  .delta.neg { color: var(--success); }
+  .delta.pos { color: #ef4444; }
+  .delta.zero { color: var(--text-secondary); }
+
+  .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+  .empty { text-align: center; padding: 24px; color: var(--text-secondary); font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="app" class="loading">Loading...</div>
+<div id="toast" class="toast">Saved!</div>
+
+<script>
+const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/body-measure';
+let data = null;
+let activeSite = null;
+
+const LABELS = {
+  lower_ab: 'Lower Ab',
+  bicep: 'Bicep',
+  neck: 'Neck',
+};
+
+function label(site) {
+  return LABELS[site] || site.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function load() {
+  try {
+    const resp = await fetch(API);
+    data = await resp.json();
+    const sites = Object.keys(data.sites);
+    activeSite = activeSite || sites[0] || 'lower_ab';
+    render();
+  } catch (e) {
+    document.getElementById('app').innerHTML = '<p>Failed to load. Check connection.</p>';
+  }
+}
+
+function formatDate(d) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatDateShort(d) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function todayLocal() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split('T')[0];
+}
+
+function timeSince(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const then = new Date(dateStr + 'T12:00:00');
+  const diffDays = Math.floor((now - then) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return '1 day ago';
+  return diffDays + ' days ago';
+}
+
+function render() {
+  const sites = Object.keys(data.sites);
+  const s = data.sites[activeSite];
+  const history = s.history || [];
+
+  document.getElementById('app').innerHTML = `
+    <h1>Body Measurements</h1>
+
+    <div class="tabs">
+      ${sites.map(site => `
+        <div class="tab ${site === activeSite ? 'active' : ''}" data-site="${site}">
+          ${label(site)}
+        </div>
+      `).join('')}
+    </div>
+
+    ${s.last_value != null ? `
+      <div class="last-info">
+        Last: <strong>${s.last_value}"</strong> on ${formatDate(s.last_date)} (${timeSince(s.last_date)})
+      </div>
+    ` : `
+      <div class="last-info">No measurements yet for ${label(activeSite)}</div>
+    `}
+
+    <form id="form">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="date" value="${todayLocal()}">
+      </div>
+      <div class="field">
+        <label>Measurement (inches)</label>
+        <input type="number" id="measurement" value="${s.last_value ?? ''}"
+               step="0.125" min="0" max="60" inputmode="decimal"
+               placeholder="${s.last_value != null ? s.last_value : 'Enter measurement'}">
+      </div>
+      <button type="submit" class="btn" id="submitBtn">Save ${label(activeSite)}</button>
+    </form>
+
+    <div class="history">
+      <h2>${label(activeSite)} History</h2>
+      ${history.length === 0 ? '<div class="empty">No entries yet</div>' : ''}
+      ${history.map((h, i) => {
+        const next = history[i + 1];
+        let deltaHtml = '';
+        if (next) {
+          const diff = Math.round((h.measurement_in - next.measurement_in) * 1000) / 1000;
+          if (diff < 0) deltaHtml = '<span class="delta neg">' + diff + '"</span>';
+          else if (diff > 0) deltaHtml = '<span class="delta pos">+' + diff + '"</span>';
+          else deltaHtml = '<span class="delta zero">0"</span>';
+        }
+        return `
+          <div class="history-item">
+            <div class="date">${formatDateShort(h.date)}</div>
+            <div class="value">${h.measurement_in}"${deltaHtml}</div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activeSite = tab.dataset.site;
+      render();
+    });
+  });
+
+  document.getElementById('form').addEventListener('submit', submit);
+}
+
+async function submit(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  const payload = {
+    date: document.getElementById('date').value,
+    site: activeSite,
+    measurement_in: parseFloat(document.getElementById('measurement').value),
+  };
+
+  if (isNaN(payload.measurement_in)) {
+    alert('Please enter a valid measurement.');
+    btn.disabled = false;
+    btn.textContent = 'Save ' + label(activeSite);
+    return;
+  }
+
+  try {
+    const resp = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('Failed');
+
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+
+    const freshResp = await fetch(API);
+    data = await freshResp.json();
+    render();
+  } catch (err) {
+    alert('Error saving. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Save ' + label(activeSite);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

@@ -7,244 +7,49 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<title>Log Shot</title>
+<title>Project Hale</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
     --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
-    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6;
-    --accent-hover: #2563eb; --success: #10b981; --radius: 12px;
+    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6; --radius: 12px;
     --shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0f172a; --surface: #1e293b; --border: #334155;
       --text: #f1f5f9; --text-secondary: #94a3b8; --accent: #60a5fa;
-      --accent-hover: #3b82f6; --success: #34d399;
       --shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
   }
-
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
     background: var(--bg); color: var(--text);
     padding: env(safe-area-inset-top) 16px 32px;
     max-width: 420px; margin: 0 auto;
     -webkit-font-smoothing: antialiased;
   }
-
-  h1 { font-size: 24px; font-weight: 700; margin: 24px 0 8px; }
-
-  .site-badge {
-    display: inline-block; background: var(--accent); color: #fff;
-    padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 600;
-    margin-bottom: 8px;
+  h1 { font-size: 24px; font-weight: 700; margin: 24px 0 24px; }
+  a.card {
+    display: block; padding: 18px 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 12px; text-decoration: none; color: var(--text);
+    box-shadow: var(--shadow); transition: border-color 0.15s;
   }
-
-  .elapsed {
-    font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;
-  }
-  .elapsed strong { color: var(--text); font-weight: 600; }
-
-  .field { margin-bottom: 16px; }
-  .field label {
-    display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary);
-    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  .field input, .field select, .field textarea {
-    width: 100%; padding: 12px 14px; font-size: 16px; color: var(--text);
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    outline: none; transition: border-color 0.15s;
-    -webkit-appearance: none; appearance: none;
-  }
-  .field input:focus, .field select:focus, .field textarea:focus {
-    border-color: var(--accent);
-  }
-  .field select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 14px center;
-    padding-right: 36px;
-  }
-  .field textarea { resize: vertical; min-height: 72px; font-family: inherit; }
-
-  .btn {
-    width: 100%; padding: 14px; font-size: 17px; font-weight: 600;
-    background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
-    cursor: pointer; transition: background 0.15s;
-  }
-  .btn:active { background: var(--accent-hover); transform: scale(0.99); }
-  .btn:disabled { opacity: 0.5; }
-
-  .toast {
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--success); color: #fff; padding: 12px 24px;
-    border-radius: var(--radius); font-weight: 600; font-size: 15px;
-    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 10;
-  }
-  .toast.show { opacity: 1; }
-
-  .history { margin-top: 32px; }
-  .history h2 {
-    font-size: 14px; font-weight: 600; color: var(--text-secondary);
-    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
-  }
-  .history-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 14px; background: var(--surface); border-radius: var(--radius);
-    margin-bottom: 8px; box-shadow: var(--shadow);
-  }
-  .history-item .date { font-weight: 600; font-size: 15px; }
-  .history-item .time { font-size: 13px; color: var(--text-secondary); }
-  .history-item .details { font-size: 13px; color: var(--text-secondary); }
-  .history-item .dose { font-weight: 600; font-size: 14px; }
-  .history-item .note-preview {
-    font-size: 12px; color: var(--text-secondary); font-style: italic;
-    margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 200px;
-  }
-
-  .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+  a.card:active { border-color: var(--accent); }
+  .card-title { font-weight: 600; font-size: 17px; margin-bottom: 4px; }
+  .card-desc { font-size: 14px; color: var(--text-secondary); }
 </style>
 </head>
 <body>
-<div id="app" class="loading">Loading...</div>
-<div id="toast" class="toast">Shot logged!</div>
-
-<script>
-const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/glp1-log';
-let defaults = null;
-
-async function load() {
-  try {
-    const resp = await fetch(API + '?json=1');
-    defaults = await resp.json();
-    render();
-  } catch (e) {
-    document.getElementById('app').innerHTML = '<p>Failed to load. Check connection.</p>';
-  }
-}
-
-function formatDate(d) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatTime(isoString) {
-  if (!isoString) return '';
-  return new Date(isoString).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
-function formatElapsed(isoString) {
-  if (!isoString) return '';
-  const now = new Date();
-  const last = new Date(isoString);
-  const diffMs = now - last;
-  if (diffMs < 0) return '';
-  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const days = Math.floor(totalHours / 24);
-  const hours = totalHours % 24;
-  if (days === 0) return `${hours}h ago`;
-  if (hours === 0) return `${days}d ago`;
-  return `${days}d ${hours}h ago`;
-}
-
-function nowLocal() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-
-function render() {
-  const d = defaults;
-  const elapsed = d.last_taken_at ? formatElapsed(d.last_taken_at) : null;
-
-  document.getElementById('app').innerHTML = `
-    <h1>Log Shot</h1>
-    <div class="site-badge">Next: ${d.next_site}</div>
-    ${elapsed ? `<div class="elapsed">Last shot: <strong>${elapsed}</strong></div>` : ''}
-
-    <form id="form">
-      <div class="field">
-        <label>Date & Time</label>
-        <input type="datetime-local" id="datetime" value="${nowLocal()}">
-      </div>
-      <div class="field">
-        <label>Dose (mg)</label>
-        <input type="number" id="dose" value="${d.default_dose_mg}" step="0.5" min="0.5" max="30">
-      </div>
-      <div class="field">
-        <label>Injection Site</label>
-        <select id="site">
-          <option ${d.next_site === 'Stomach - Left' ? 'selected' : ''}>Stomach - Left</option>
-          <option ${d.next_site === 'Stomach - Right' ? 'selected' : ''}>Stomach - Right</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Medication</label>
-        <input type="text" id="medication" value="${d.default_medication}">
-      </div>
-      <div class="field">
-        <label>Notes (optional)</label>
-        <textarea id="notes" placeholder="Side effects, food noise, appetite..."></textarea>
-      </div>
-      <button type="submit" class="btn" id="submitBtn">Save Shot</button>
-    </form>
-
-    <div class="history">
-      <h2>Recent Shots</h2>
-      ${d.recent_history.map(h => `
-        <div class="history-item">
-          <div>
-            <div class="date">${formatDate(h.date)}${h.taken_at ? ` <span class="time">${formatTime(h.taken_at)}</span>` : ''}</div>
-            <div class="details">${h.site || ''}</div>
-            ${h.notes ? `<div class="note-preview">${h.notes}</div>` : ''}
-          </div>
-          <div class="dose">${h.dose_mg}mg</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-
-  document.getElementById('form').addEventListener('submit', submit);
-}
-
-async function submit(e) {
-  e.preventDefault();
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = 'Saving...';
-
-  const payload = {
-    datetime: document.getElementById('datetime').value,
-    dose_mg: parseFloat(document.getElementById('dose').value),
-    site: document.getElementById('site').value,
-    medication: document.getElementById('medication').value,
-    notes: document.getElementById('notes').value || null,
-  };
-
-  try {
-    const resp = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!resp.ok) throw new Error('Failed');
-
-    const toast = document.getElementById('toast');
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
-
-    const freshResp = await fetch(API + '?json=1');
-    defaults = await freshResp.json();
-    render();
-  } catch (err) {
-    alert('Error saving shot. Please try again.');
-    btn.disabled = false;
-    btn.textContent = 'Save Shot';
-  }
-}
-
-load();
-</script>
+  <h1>Project Hale</h1>
+  <a class="card" href="shot.html">
+    <div class="card-title">Log Shot</div>
+    <div class="card-desc">GLP-1 injection tracking</div>
+  </a>
+  <a class="card" href="measure.html">
+    <div class="card-title">Body Measurements</div>
+    <div class="card-desc">Lower ab, bicep, neck</div>
+  </a>
 </body>
 </html>
