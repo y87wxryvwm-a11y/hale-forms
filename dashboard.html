@@ -180,12 +180,6 @@ function render(d) {
         </span>
       </div>
       ` : ''}
-      ${oura?.workouts_7d ? `
-      <div class="stat-row">
-        <span class="stat-label">Workouts (7d)</span>
-        <span class="stat-value">${oura.workouts_7d.count}</span>
-      </div>
-      ` : ''}
       ${oura?.readiness?.stale_days > 0 ? `<div class="stat-sub"><span class="badge stale">Stale ${oura.readiness.stale_days}d</span></div>` : ''}
     </div>
 
