@@ -153,14 +153,13 @@ const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/creatine-log'
 let state = null;
 
 function gaugeColor(pct) {
-  if (pct >= 95) return 'var(--success)';
   if (pct >= 70) return 'var(--success)';
   if (pct >= 30) return 'var(--warning)';
   return 'var(--danger)';
 }
 
 function statusLabel(pct) {
-  if (pct >= 95) return { text: 'MAX BOOSTO', color: 'var(--success)' };
+  if (pct >= 88) return { text: 'MAX BOOSTO', color: 'var(--success)' };
   if (pct >= 70) return { text: 'BOOSTO', color: 'var(--success)' };
   if (pct >= 30) return { text: 'Approaching boost', color: 'var(--warning)' };
   return { text: 'Building', color: 'var(--text-secondary)' };
@@ -217,7 +216,7 @@ function render() {
   }
   if (pct < 70 && state.days_to_boost != null) {
     infoHtml += `<span><strong>~${state.days_to_boost}d</strong> to BOOSTO at 5g/day</span>`;
-  } else if (pct >= 70 && pct < 95 && state.days_to_max != null) {
+  } else if (pct >= 70 && pct < 88 && state.days_to_max != null) {
     infoHtml += `<span><strong>~${state.days_to_max}d</strong> to MAX BOOSTO at 5g/day</span>`;
   }
 
