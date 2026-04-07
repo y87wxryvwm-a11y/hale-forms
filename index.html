@@ -13,13 +13,17 @@
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
-    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6; --radius: 12px;
+    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6;
+    --accent-hover: #2563eb; --success: #10b981; --warning: #f59e0b;
+    --danger: #ef4444; --radius: 12px;
     --shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #0f172a; --surface: #1e293b; --border: #334155;
       --text: #f1f5f9; --text-secondary: #94a3b8; --accent: #60a5fa;
+      --accent-hover: #3b82f6; --success: #34d399; --warning: #fbbf24;
+      --danger: #f87171;
       --shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
   }
@@ -31,6 +35,59 @@
     -webkit-font-smoothing: antialiased;
   }
   h1 { font-size: 24px; font-weight: 700; margin: 24px 0 24px; }
+
+  /* Gauge */
+  .gauge-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    margin-bottom: 16px;
+  }
+  .gauge-svg { width: 200px; height: 120px; }
+  .gauge-bg { fill: none; stroke: var(--border); stroke-width: 14; stroke-linecap: round; }
+  .gauge-fill { fill: none; stroke-width: 14; stroke-linecap: round;
+    transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease; }
+  .gauge-pct {
+    font-size: 36px; font-weight: 700; margin-top: -8px;
+  }
+  .gauge-label {
+    font-size: 13px; color: var(--text-secondary); margin-top: 2px;
+  }
+
+  /* Info row */
+  .info-row {
+    display: flex; justify-content: center; gap: 20px;
+    margin-bottom: 20px; font-size: 13px; color: var(--text-secondary);
+  }
+  .info-row strong { color: var(--text); font-weight: 600; }
+
+  /* Quick log */
+  .log-row {
+    display: flex; gap: 10px; margin-bottom: 24px;
+  }
+  .log-row input {
+    flex: 1; padding: 12px 14px; font-size: 16px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    outline: none; -webkit-appearance: none; appearance: none;
+    transition: border-color 0.15s;
+  }
+  .log-row input:focus { border-color: var(--accent); }
+  .log-row button {
+    padding: 12px 20px; font-size: 15px; font-weight: 600;
+    background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+    cursor: pointer; white-space: nowrap; transition: background 0.15s;
+  }
+  .log-row button:active { background: var(--accent-hover); transform: scale(0.99); }
+  .log-row button:disabled { opacity: 0.5; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--success); color: #fff; padding: 12px 24px;
+    border-radius: var(--radius); font-weight: 600; font-size: 15px;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Nav cards */
   a.card {
     display: block; padding: 18px 16px; background: var(--surface);
     border: 1px solid var(--border); border-radius: var(--radius);
@@ -40,21 +97,157 @@
   a.card:active { border-color: var(--accent); }
   .card-title { font-weight: 600; font-size: 17px; margin-bottom: 4px; }
   .card-desc { font-size: 14px; color: var(--text-secondary); }
+
+  .section-label {
+    font-size: 12px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 10px;
+  }
+
+  .loading-msg { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 14px; }
 </style>
 </head>
 <body>
-  <h1>Project Hale</h1>
-  <a class="card" href="dashboard.html">
-    <div class="card-title">Dashboard</div>
-    <div class="card-desc">Health snapshot — weight, Oura, GLP-1, goals</div>
-  </a>
-  <a class="card" href="shot.html">
-    <div class="card-title">Log Shot</div>
-    <div class="card-desc">GLP-1 injection tracking</div>
-  </a>
-  <a class="card" href="measure.html">
-    <div class="card-title">Body Measurements</div>
-    <div class="card-desc">Lower ab, bicep, neck</div>
-  </a>
+<h1>Project Hale</h1>
+
+<div id="creatine">
+  <div class="loading-msg">Loading creatine data...</div>
+</div>
+
+<div class="section-label">Tools</div>
+<a class="card" href="dashboard.html">
+  <div class="card-title">Dashboard</div>
+  <div class="card-desc">Health snapshot — weight, Oura, GLP-1, goals</div>
+</a>
+<a class="card" href="shot.html">
+  <div class="card-title">Log Shot</div>
+  <div class="card-desc">GLP-1 injection tracking</div>
+</a>
+<a class="card" href="measure.html">
+  <div class="card-title">Body Measurements</div>
+  <div class="card-desc">Lower ab, bicep, neck</div>
+</a>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/creatine-log';
+let state = null;
+
+function gaugeColor(pct) {
+  if (pct >= 70) return 'var(--success)';
+  if (pct >= 30) return 'var(--warning)';
+  return 'var(--danger)';
+}
+
+function timeSince(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const then = new Date(dateStr + 'T12:00:00');
+  const days = Math.round((now - then) / 86400000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return days + ' days ago';
+}
+
+function render() {
+  const el = document.getElementById('creatine');
+  if (!state) {
+    el.innerHTML = '<div class="loading-msg">Could not load creatine data.</div>';
+    return;
+  }
+
+  const pct = state.loading_pct;
+  const color = gaugeColor(pct);
+
+  // SVG arc: semicircle from left to right
+  // Arc center at (100, 100), radius 80, from 180° to 0° (left to right)
+  const radius = 80;
+  const circumference = Math.PI * radius; // half circle
+  const filled = circumference * (pct / 100);
+  const dashoffset = circumference - filled;
+
+  let infoHtml = '';
+  if (state.streak_days > 0) {
+    infoHtml += `<span><strong>${state.streak_days}</strong> day${state.streak_days === 1 ? '' : 's'} in a row</span>`;
+  }
+  if (state.last_dose) {
+    infoHtml += `<span>Last dose: <strong>${timeSince(state.last_dose.date)}</strong></span>`;
+  }
+  if (state.days_to_saturated != null && pct < 95) {
+    infoHtml += `<span><strong>~${state.days_to_saturated}d</strong> to full at 5g/day</span>`;
+  }
+
+  el.innerHTML = `
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 200 120">
+        <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+        <path class="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100"
+          stroke="${color}"
+          stroke-dasharray="${circumference}"
+          stroke-dashoffset="${dashoffset}" />
+      </svg>
+      <div class="gauge-pct" style="color:${color}">${pct}%</div>
+      <div class="gauge-label">Creatine Loading</div>
+    </div>
+    ${infoHtml ? `<div class="info-row">${infoHtml}</div>` : ''}
+    <form class="log-row" id="logForm">
+      <input type="number" id="doseInput" value="5" step="0.5" min="0.5" max="30"
+        inputmode="decimal" placeholder="grams">
+      <button type="submit" id="logBtn">Log Creatine</button>
+    </form>
+  `;
+
+  document.getElementById('logForm').addEventListener('submit', submitDose);
+}
+
+async function load() {
+  try {
+    const resp = await fetch(API + '?json=1');
+    state = await resp.json();
+  } catch (e) {
+    state = null;
+  }
+  render();
+}
+
+async function submitDose(e) {
+  e.preventDefault();
+  const btn = document.getElementById('logBtn');
+  const input = document.getElementById('doseInput');
+  const dose = parseFloat(input.value);
+  if (isNaN(dose) || dose <= 0) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Logging...';
+
+  try {
+    const resp = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dose_grams: dose }),
+    });
+    if (!resp.ok) throw new Error('Failed');
+    const result = await resp.json();
+
+    // Show toast with delta
+    const toast = document.getElementById('toast');
+    const delta = result.delta_pct > 0 ? `+${result.delta_pct}%` : `${result.delta_pct}%`;
+    toast.textContent = `Logged ${dose}g! ${delta}`;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+
+    // Reload to get fresh state
+    const freshResp = await fetch(API + '?json=1');
+    state = await freshResp.json();
+    render();
+  } catch (err) {
+    alert('Error logging creatine. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Log Creatine';
+  }
+}
+
+load();
+</script>
 </body>
 </html>
