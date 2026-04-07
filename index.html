@@ -41,15 +41,22 @@
     display: flex; flex-direction: column; align-items: center;
     margin-bottom: 16px;
   }
-  .gauge-svg { width: 200px; height: 120px; }
+  .gauge-svg { width: 220px; height: 130px; }
   .gauge-bg { fill: none; stroke: var(--border); stroke-width: 14; stroke-linecap: round; }
   .gauge-fill { fill: none; stroke-width: 14; stroke-linecap: round;
     transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease; }
+  .gauge-tick { stroke: var(--text); stroke-width: 2; opacity: 0.55; }
   .gauge-pct {
-    font-size: 36px; font-weight: 700; margin-top: -8px;
+    font-size: 38px; font-weight: 700; margin-top: -8px;
+    transition: color 0.6s ease;
+  }
+  .gauge-status {
+    font-size: 14px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; margin-top: 4px;
+    transition: color 0.6s ease;
   }
   .gauge-label {
-    font-size: 13px; color: var(--text-secondary); margin-top: 2px;
+    font-size: 12px; color: var(--text-secondary); margin-top: 2px;
   }
 
   /* Info row */
@@ -60,23 +67,35 @@
   .info-row strong { color: var(--text); font-weight: 600; }
 
   /* Quick log */
+  .log-form { margin-bottom: 24px; }
   .log-row {
-    display: flex; gap: 10px; margin-bottom: 24px;
+    display: flex; gap: 10px; margin-bottom: 8px;
   }
-  .log-row input {
+  .log-form input {
     flex: 1; padding: 12px 14px; font-size: 16px; color: var(--text);
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     outline: none; -webkit-appearance: none; appearance: none;
     transition: border-color 0.15s;
   }
-  .log-row input:focus { border-color: var(--accent); }
-  .log-row button {
+  .log-form input:focus { border-color: var(--accent); }
+  .log-form button {
     padding: 12px 20px; font-size: 15px; font-weight: 600;
     background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
     cursor: pointer; white-space: nowrap; transition: background 0.15s;
   }
-  .log-row button:active { background: var(--accent-hover); transform: scale(0.99); }
-  .log-row button:disabled { opacity: 0.5; }
+  .log-form button:active { background: var(--accent-hover); transform: scale(0.99); }
+  .log-form button:disabled { opacity: 0.5; }
+  .when-row {
+    display: flex; align-items: center; gap: 8px; font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .when-row input {
+    flex: 1; padding: 8px 10px; font-size: 13px;
+  }
+  .when-row a {
+    color: var(--accent); cursor: pointer; text-decoration: none;
+    font-weight: 600;
+  }
 
   /* Toast */
   .toast {
@@ -134,9 +153,23 @@ const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/creatine-log'
 let state = null;
 
 function gaugeColor(pct) {
+  if (pct >= 95) return 'var(--success)';
   if (pct >= 70) return 'var(--success)';
   if (pct >= 30) return 'var(--warning)';
   return 'var(--danger)';
+}
+
+function statusLabel(pct) {
+  if (pct >= 95) return { text: 'MAX BOOSTO', color: 'var(--success)' };
+  if (pct >= 70) return { text: 'BOOSTO', color: 'var(--success)' };
+  if (pct >= 30) return { text: 'Approaching boost', color: 'var(--warning)' };
+  return { text: 'Building', color: 'var(--text-secondary)' };
+}
+
+function nowLocalDatetime() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
 }
 
 function timeSince(dateStr) {
@@ -158,46 +191,69 @@ function render() {
 
   const pct = state.loading_pct;
   const color = gaugeColor(pct);
+  const status = statusLabel(pct);
 
-  // SVG arc: semicircle from left to right
-  // Arc center at (100, 100), radius 80, from 180° to 0° (left to right)
-  const radius = 80;
+  // Semicircle arc: center at (110, 110), radius 90, from 180° to 0°
+  const cx = 110, cy = 110, radius = 90;
   const circumference = Math.PI * radius; // half circle
-  const filled = circumference * (pct / 100);
+  const filled = circumference * (Math.min(100, pct) / 100);
   const dashoffset = circumference - filled;
+
+  // Tick at 70% along the arc
+  // Angle along semicircle: 180° (left) to 0° (right). 70% → 180 - (70/100)*180 = 54°
+  const tickAngle = (180 - (70 / 100) * 180) * Math.PI / 180;
+  const tickInner = 82, tickOuter = 98;
+  const tx1 = cx + tickInner * Math.cos(tickAngle);
+  const ty1 = cy - tickInner * Math.sin(tickAngle);
+  const tx2 = cx + tickOuter * Math.cos(tickAngle);
+  const ty2 = cy - tickOuter * Math.sin(tickAngle);
 
   let infoHtml = '';
   if (state.streak_days > 0) {
     infoHtml += `<span><strong>${state.streak_days}</strong> day${state.streak_days === 1 ? '' : 's'} in a row</span>`;
   }
   if (state.last_dose) {
-    infoHtml += `<span>Last dose: <strong>${timeSince(state.last_dose.date)}</strong></span>`;
+    infoHtml += `<span>Last: <strong>${timeSince(state.last_dose.date)}</strong></span>`;
   }
-  if (state.days_to_saturated != null && pct < 95) {
-    infoHtml += `<span><strong>~${state.days_to_saturated}d</strong> to full at 5g/day</span>`;
+  if (pct < 70 && state.days_to_boost != null) {
+    infoHtml += `<span><strong>~${state.days_to_boost}d</strong> to BOOSTO at 5g/day</span>`;
+  } else if (pct >= 70 && pct < 95 && state.days_to_max != null) {
+    infoHtml += `<span><strong>~${state.days_to_max}d</strong> to MAX BOOSTO at 5g/day</span>`;
   }
 
   el.innerHTML = `
     <div class="gauge-wrap">
-      <svg class="gauge-svg" viewBox="0 0 200 120">
-        <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
-        <path class="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100"
+      <svg class="gauge-svg" viewBox="0 0 220 130">
+        <path class="gauge-bg" d="M 20 110 A 90 90 0 0 1 200 110" />
+        <path class="gauge-fill" d="M 20 110 A 90 90 0 0 1 200 110"
           stroke="${color}"
           stroke-dasharray="${circumference}"
           stroke-dashoffset="${dashoffset}" />
+        <line class="gauge-tick" x1="${tx1.toFixed(1)}" y1="${ty1.toFixed(1)}" x2="${tx2.toFixed(1)}" y2="${ty2.toFixed(1)}" />
       </svg>
       <div class="gauge-pct" style="color:${color}">${pct}%</div>
-      <div class="gauge-label">Creatine Loading</div>
+      <div class="gauge-status" style="color:${status.color}">${status.text}</div>
+      <div class="gauge-label">Creatine Loading · tick = boost zone</div>
     </div>
     ${infoHtml ? `<div class="info-row">${infoHtml}</div>` : ''}
-    <form class="log-row" id="logForm">
-      <input type="number" id="doseInput" value="5" step="0.5" min="0.5" max="30"
-        inputmode="decimal" placeholder="grams">
-      <button type="submit" id="logBtn">Log Creatine</button>
+    <form class="log-form" id="logForm">
+      <div class="log-row">
+        <input type="number" id="doseInput" value="5" step="0.5" min="0.5" max="30"
+          inputmode="decimal" placeholder="grams">
+        <button type="submit" id="logBtn">Log Creatine</button>
+      </div>
+      <div class="when-row">
+        <span>When:</span>
+        <input type="datetime-local" id="whenInput" value="${nowLocalDatetime()}">
+        <a id="resetWhen">now</a>
+      </div>
     </form>
   `;
 
   document.getElementById('logForm').addEventListener('submit', submitDose);
+  document.getElementById('resetWhen').addEventListener('click', () => {
+    document.getElementById('whenInput').value = nowLocalDatetime();
+  });
 }
 
 async function load() {
@@ -221,10 +277,13 @@ async function submitDose(e) {
   btn.textContent = 'Logging...';
 
   try {
+    const whenVal = document.getElementById('whenInput').value;
+    const payload = { dose_grams: dose };
+    if (whenVal) payload.datetime = new Date(whenVal).toISOString();
     const resp = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dose_grams: dose }),
+      body: JSON.stringify(payload),
     });
     if (!resp.ok) throw new Error('Failed');
     const result = await resp.json();
