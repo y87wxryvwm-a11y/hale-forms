@@ -116,6 +116,29 @@ async function load() {
   }
 }
 
+const SITE_LABELS = {
+  lower_ab: 'Lower Ab', waist: 'Waist', hip: 'Hip', bicep: 'Bicep', neck: 'Neck',
+};
+function siteLabel(s) {
+  return SITE_LABELS[s] || s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+function fmtDelta(n, unit) {
+  if (n == null) return '';
+  const sign = n > 0 ? '+' : '';
+  return `${sign}${n}${unit}`;
+}
+function deltaClass(n, lowerIsBetter = true) {
+  if (n == null || n === 0) return 'flat';
+  const good = lowerIsBetter ? n < 0 : n > 0;
+  return good ? 'on-track' : 'behind';
+}
+function creatineStatus(pct) {
+  if (pct >= 88) return { text: 'MAX BOOSTO', cls: 'on-track' };
+  if (pct >= 70) return { text: 'BOOSTO', cls: 'on-track' };
+  if (pct >= 30) return { text: 'Approaching', cls: 'stale' };
+  return { text: 'Building', cls: 'flat' };
+}
+
 function render(d) {
   const w = d.weight;
   const oura = d.oura;
@@ -125,6 +148,8 @@ function render(d) {
   const ab = d.body_composition?.latest_ab;
   const bicep = d.body_composition?.latest_bicep;
   const dexa = d.body_composition?.latest_dexa;
+  const measurements = d.body_composition?.measurements || {};
+  const creatine = d.creatine;
 
   document.getElementById('app').innerHTML = `
     <h1>Dashboard</h1>
@@ -184,29 +209,69 @@ function render(d) {
     </div>
 
     <div class="card">
-      <div class="card-header">Body Composition</div>
-      ${ab ? `
-      <div class="stat-row">
-        <span class="stat-label">Lower ab</span>
-        <span class="stat-value">${ab.measurement_in}"</span>
-      </div>
-      ${ab.rate_per_week != null ? `<div class="stat-sub">${ab.rate_per_week}"/wk${ab.projection?.on_track != null ? ` <span class="badge ${ab.projection.on_track ? 'on-track' : 'behind'}">${ab.projection.on_track ? 'On Track' : 'Behind'}</span>` : ''}</div>` : ''}
-      ` : ''}
-      ${bicep ? `
-      <div class="stat-row">
-        <span class="stat-label">Bicep</span>
-        <span class="stat-value">${bicep.measurement_in}"</span>
-      </div>
-      ${bicep.rate_per_week != null ? `<div class="stat-sub">${bicep.rate_per_week}"/wk</div>` : ''}
-      ` : ''}
-      ${dexa ? `
-      <div class="stat-row">
-        <span class="stat-label">Last DEXA</span>
-        <span class="stat-value">${Number(dexa.body_fat_pct).toFixed(1)}% BF</span>
-      </div>
-      <div class="stat-sub">${new Date(dexa.scan_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} — ${Number(dexa.lean_mass_lbs).toFixed(0)} lbs lean</div>
-      ` : ''}
+      <div class="card-header">Body Measurements</div>
+      ${Object.entries(measurements).filter(([_, m]) => m != null).map(([site, m]) => `
+        <div class="stat-row">
+          <span class="stat-label">${siteLabel(site)}</span>
+          <span class="stat-value">${m.current.measurement_in}"</span>
+        </div>
+        <div class="stat-sub">
+          baseline ${m.baseline.measurement_in}" (${new Date(m.baseline.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})
+          <span class="badge ${deltaClass(m.change_from_baseline_in)}">${fmtDelta(m.change_from_baseline_in, '"')}</span>
+        </div>
+      `).join('')}
+      ${Object.values(measurements).every(m => m == null) ? '<div class="stat-sub" style="text-align:left">No measurements logged yet.</div>' : ''}
     </div>
+
+    ${dexa ? `
+    <div class="card">
+      <div class="card-header">DEXA Scan</div>
+      <div class="stat-row">
+        <span class="stat-label">Body fat</span>
+        <span class="stat-value">${Number(dexa.body_fat_pct).toFixed(1)}%</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Lean mass</span>
+        <span class="stat-value">${Number(dexa.lean_mass_lbs).toFixed(0)} lbs</span>
+      </div>
+      <div class="stat-sub">${new Date(dexa.scan_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+    </div>
+    ` : ''}
+
+    ${creatine ? (() => {
+      const status = creatineStatus(creatine.loading_pct);
+      const change = creatine.change_pct_7d;
+      return `
+    <div class="card">
+      <div class="card-header">Creatine Loading</div>
+      <div class="stat-row">
+        <span class="stat-label">Now</span>
+        <span class="stat-value">
+          ${creatine.loading_pct}%
+          <span class="badge ${status.cls}">${status.text}</span>
+        </span>
+      </div>
+      <div class="stat-sub">
+        7d ago ${creatine.loading_pct_7d_ago}%
+        ${change != null && change !== 0 ? `<span class="badge ${deltaClass(change, false)}">${fmtDelta(change, '%')}</span>` : ''}
+      </div>
+      ${creatine.days_to_boost != null && creatine.loading_pct < 70 ? `
+      <div class="stat-row">
+        <span class="stat-label">Days to BOOSTO</span>
+        <span class="stat-value">~${creatine.days_to_boost}d</span>
+      </div>
+      ` : ''}
+      ${creatine.days_to_max != null && creatine.loading_pct >= 70 && creatine.loading_pct < 88 ? `
+      <div class="stat-row">
+        <span class="stat-label">Days to MAX</span>
+        <span class="stat-value">~${creatine.days_to_max}d</span>
+      </div>
+      ` : ''}
+      ${creatine.latest_dose_date ? `<div class="stat-sub">Last dose ${creatine.latest_dose_date} (${creatine.latest_dose_grams}g) · streak ${creatine.streak_days}d</div>` : '<div class="stat-sub">No doses logged yet.</div>'}
+      ${creatine.first_dose_date ? `<div class="stat-sub" style="text-align:left">Started ${new Date(creatine.first_dose_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — confounds weight (water retention)</div>` : ''}
+    </div>
+      `;
+    })() : ''}
 
     <div class="card">
       <div class="card-header">GLP-1</div>
