@@ -168,7 +168,7 @@ function render(d) {
       </div>
       <div class="stat-row">
         <span class="stat-label">Weekly rate</span>
-        <span class="stat-value">${w.weekly_rate_lbs} lbs/wk</span>
+        <span class="stat-value">${w.weekly_rate_lbs != null ? (w.weekly_rate_lbs > 0 ? '+' : '') + w.weekly_rate_lbs + ' lbs/wk' : '—'}</span>
       </div>
       ${w.projection ? `
       <div class="stat-row">
@@ -216,8 +216,10 @@ function render(d) {
           <span class="stat-value">${m.current.measurement_in}"</span>
         </div>
         <div class="stat-sub">
-          baseline ${m.baseline.measurement_in}" (${new Date(m.baseline.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})
-          <span class="badge ${deltaClass(m.change_from_baseline_in)}">${fmtDelta(m.change_from_baseline_in, '"')}</span>
+          ${m.baseline.is_fallback
+            ? `new site — baseline pending`
+            : `baseline ${m.baseline.measurement_in}" (${new Date(m.baseline.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })})
+               <span class="badge ${deltaClass(m.change_from_baseline_in)}">${fmtDelta(m.change_from_baseline_in, '"')}</span>`}
         </div>
       `).join('')}
       ${Object.values(measurements).every(m => m == null) ? '<div class="stat-sub" style="text-align:left">No measurements logged yet.</div>' : ''}
@@ -279,6 +281,12 @@ function render(d) {
         <span class="stat-label">Dose</span>
         <span class="stat-value">${glp1?.current_dose_mg ?? '—'} mg</span>
       </div>
+      ${glp1?.days_since_last_dose != null ? `
+      <div class="stat-row">
+        <span class="stat-label">Last dose</span>
+        <span class="stat-value">${glp1.days_since_last_dose === 0 ? 'today' : glp1.days_since_last_dose + 'd ago'}</span>
+      </div>
+      ` : ''}
       ${glp1?.days_on_current_dose != null ? `
       <div class="stat-row">
         <span class="stat-label">On this dose</span>
@@ -290,7 +298,6 @@ function render(d) {
         <span class="stat-label">Est. level today</span>
         <span class="stat-value">${glp1.level.projected_today_mg ?? glp1.level.avg_level_mg} mg</span>
       </div>
-      ${glp1.level.stale_days > 0 ? `<div class="stat-sub">Modeled from ${glp1.level.as_of} data <span class="badge stale">${glp1.level.stale_days}d stale</span></div>` : ''}
       ` : ''}
       <div class="stat-row">
         <span class="stat-label">Adherence</span>
@@ -301,21 +308,38 @@ function render(d) {
     ${goals.length > 0 ? `
     <div class="card">
       <div class="card-header">Goal Progress</div>
-      ${goals.map(g => `
+      ${goals.map(g => {
+        const unit = g.metric.includes('lbs') ? ' lbs' : g.metric.includes('pct') ? '%' : '"';
+        const hasRange = Array.isArray(g.current_range);
+        const onTrackBadge = g.on_track === true
+          ? '<span class="badge on-track">On Track</span>'
+          : g.on_track === false
+            ? '<span class="badge behind">Behind</span>'
+            : hasRange
+              ? '<span class="badge stale">Uncertain</span>'
+              : '';
+        return `
         <div class="goal-item">
           <div class="goal-top">
             <span class="goal-label">${g.target_label}</span>
-            ${g.on_track != null ? `<span class="badge ${g.on_track ? 'on-track' : 'behind'}">${g.on_track ? 'On Track' : 'Behind'}</span>` : ''}
+            ${onTrackBadge}
           </div>
-          ${g.current != null ? `
+          ${hasRange ? `
             <div class="goal-detail">
-              Now: ${g.current}${g.metric.includes('lbs') ? ' lbs' : g.metric.includes('pct') ? '%' : '"'}
-              ${g.gap != null ? ` — ${Math.abs(g.gap)} to go` : ''}
+              Now: ~${g.current_range[0]}–${g.current_range[1]}${unit}
+              ${g.note ? ` — ${g.note}` : ''}
+            </div>
+            ${g.method_label ? `<div class="goal-detail" style="font-style:italic">est. ${g.method_label}</div>` : ''}
+          ` : g.current != null ? `
+            <div class="goal-detail">
+              Now: ${g.current}${unit}
+              ${g.gap != null ? ` — ${Math.abs(g.gap)}${unit} to go` : ''}
               ${g.projected_date ? ` — est. ${new Date(g.projected_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
             </div>
           ` : g.note ? `<div class="goal-detail">${g.note}</div>` : ''}
         </div>
-      `).join('')}
+        `;
+      }).join('')}
     </div>
     ` : ''}
 
