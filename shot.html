@@ -215,8 +215,9 @@ async function submit(e) {
   btn.disabled = true;
   btn.textContent = 'Saving...';
 
+  const dtLocal = document.getElementById('datetime').value;
   const payload = {
-    datetime: document.getElementById('datetime').value,
+    datetime: dtLocal ? new Date(dtLocal).toISOString() : null,
     dose_mg: parseFloat(document.getElementById('dose').value),
     site: document.getElementById('site').value,
     medication: document.getElementById('medication').value,
