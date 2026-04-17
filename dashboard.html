@@ -328,14 +328,22 @@ function render(d) {
 
 
     ${(() => {
-      const withBaseline = Object.entries(measurements).filter(([_, m]) => m != null && !m.baseline.is_fallback);
-      const placeholders = Object.entries(measurements).filter(([_, m]) => m != null && m.baseline.is_fallback);
-      if (withBaseline.length === 0 && placeholders.length === 0) return '';
+      const sites = Object.entries(measurements).filter(([_, m]) => m != null);
+      if (sites.length === 0) return '';
+      const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       return `
     <div class="card">
       <div class="card-header">Body Measurements</div>
-      ${withBaseline.map(([site, m]) => {
-        const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      ${sites.map(([site, m]) => {
+        if (m.baseline.is_fallback) {
+          return `
+        <div class="stat-row">
+          <span class="stat-label">${siteLabel(site)}</span>
+          <span class="stat-value">${m.current.measurement_in}"</span>
+        </div>
+        <div class="stat-sub">${fmtDate(m.current.date)} · no baseline yet</div>
+      `;
+        }
         return `
         <div class="stat-row">
           <span class="stat-label">${siteLabel(site)}</span>
@@ -346,7 +354,6 @@ function render(d) {
         <div class="stat-sub">${fmtDate(m.current.date)} vs ${fmtDate(m.baseline.date)} baseline (${m.baseline.measurement_in}")</div>
       `;
       }).join('')}
-      ${placeholders.length > 0 ? `<div class="stat-sub" style="text-align:left">+${placeholders.length} site${placeholders.length > 1 ? 's' : ''} tracking baseline: ${placeholders.map(([s]) => siteLabel(s)).join(', ')}</div>` : ''}
     </div>
       `;
     })()}
