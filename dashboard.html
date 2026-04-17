@@ -262,22 +262,27 @@ function render(d) {
             ${a.rem_sleep_min != null ? `<div class="avg">7d ${a.rem_sleep_min}m</div>` : ''}
           </div>
           <div class="sleep-cell">
-            <div class="val">${s.hrv != null ? s.hrv : '—'}</div>
+            <div class="val">${s.average_hrv != null ? Math.round(s.average_hrv) : '—'}</div>
             <div class="lbl">HRV</div>
-            ${a.average_hrv != null ? `<div class="avg">7d ${a.average_hrv}</div>` : ''}
+            ${a.average_hrv != null ? `<div class="avg">7d ${Math.round(a.average_hrv)}</div>` : ''}
           </div>
           <div class="sleep-cell">
-            <div class="val">${s.average_heart_rate != null ? s.average_heart_rate : '—'}</div>
+            <div class="val">${s.average_heart_rate != null ? Math.round(s.average_heart_rate) : '—'}</div>
             <div class="lbl">Avg HR</div>
-            ${a.lowest_heart_rate != null ? `<div class="avg">7d low ${a.lowest_heart_rate}</div>` : ''}
+            ${a.lowest_heart_rate != null ? `<div class="avg">7d low ${Math.round(a.lowest_heart_rate)}</div>` : ''}
           </div>
           <div class="sleep-cell">
             <div class="val">${s.efficiency != null ? s.efficiency + '%' : '—'}</div>
             <div class="lbl">Efficiency</div>
-            ${a.efficiency != null ? `<div class="avg">7d ${a.efficiency}%</div>` : ''}
+            ${a.efficiency != null ? `<div class="avg">7d ${Math.round(a.efficiency)}%</div>` : ''}
           </div>
         </div>
-        ${s.bedtime_start || s.bedtime_end ? `<div class="sleep-bedtime">${fmtTime(s.bedtime_start)} → ${fmtTime(s.bedtime_end)}${s.sleep_latency_min != null ? ` · latency ${s.sleep_latency_min}m` : ''}${s.restless_periods != null ? ` · restless ${s.restless_periods}` : ''}</div>` : ''}
+        <div class="sleep-bedtime">
+          ${s.bedtime_start || s.bedtime_end ? `${fmtTime(s.bedtime_start)} → ${fmtTime(s.bedtime_end)}` : ''}
+          ${s.latency_min != null ? ` · latency ${s.latency_min}m` : ''}
+          ${s.awake_min != null ? ` · awake ${s.awake_min}m` : ''}
+          ${s.day ? `<div style="margin-top:2px">session ${new Date(s.day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</div>` : ''}
+        </div>
         `;
       })()}
       ${oura?.readiness?.stale_days > 0 ? `<div class="stat-sub"><span class="badge stale">Stale ${oura.readiness.stale_days}d</span></div>` : ''}
