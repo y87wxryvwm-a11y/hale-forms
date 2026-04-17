@@ -71,12 +71,6 @@
   .badge.moderate { background: var(--warning); color: #000; }
   .badge.low { background: var(--border); color: var(--text-secondary); }
 
-  .confounder-note {
-    font-size: 12px; color: var(--text-secondary);
-    background: var(--bg); border-left: 3px solid var(--warning);
-    padding: 6px 10px; margin-top: 8px; border-radius: 4px;
-  }
-
   .goal-item {
     padding: 10px 0; border-bottom: 1px solid var(--border);
   }
@@ -266,7 +260,6 @@ function render(d) {
         high: 'high', moderate: 'moderate',
         low: 'low', insufficient_data: 'insufficient',
       }[proj?.confidence ?? 'insufficient_data'];
-      const confounders = w.confounders ?? [];
       return `
     <div class="card">
       <div class="card-header">Weight</div>
@@ -288,7 +281,6 @@ function render(d) {
       ${bandText ? `
       <div class="stat-sub">${bandText}</div>
       ` : ''}
-      ${confounders.map((c) => `<div class="confounder-note">${c.note}</div>`).join('')}
       ${recentText ? `
       <div class="stat-row">
         <span class="stat-label">14d rate</span>
@@ -296,7 +288,7 @@ function render(d) {
           ${recentText}
         </span>
       </div>
-      <div class="stat-sub">${confounders.length > 0 ? 'confounded window — see note above' : 'short window'}</div>
+      <div class="stat-sub">short window</div>
       ` : ''}
       ${proj ? `
       <div class="stat-row">
@@ -320,15 +312,18 @@ function render(d) {
       return `
     <div class="card">
       <div class="card-header">Body Measurements</div>
-      ${withBaseline.map(([site, m]) => `
+      ${withBaseline.map(([site, m]) => {
+        const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `
         <div class="stat-row">
           <span class="stat-label">${siteLabel(site)}</span>
           <span class="stat-value">${m.current.measurement_in}"
             <span class="badge ${deltaClass(m.change_from_baseline_in)}">${fmtDelta(m.change_from_baseline_in, '"')}</span>
           </span>
         </div>
-        <div class="stat-sub">baseline ${m.baseline.measurement_in}" (${new Date(m.baseline.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })})</div>
-      `).join('')}
+        <div class="stat-sub">${fmtDate(m.current.date)} vs ${fmtDate(m.baseline.date)} baseline (${m.baseline.measurement_in}")</div>
+      `;
+      }).join('')}
       ${placeholders.length > 0 ? `<div class="stat-sub" style="text-align:left">+${placeholders.length} site${placeholders.length > 1 ? 's' : ''} tracking baseline: ${placeholders.map(([s]) => siteLabel(s)).join(', ')}</div>` : ''}
     </div>
       `;
@@ -339,8 +334,6 @@ function render(d) {
       const whtr = metrics.waist_to_height;
       const whr = metrics.waist_to_hip;
       const bf = metrics.body_fat_pct || {};
-      const lbm = metrics.lean_body_mass_lbs;
-      const ffmi = metrics.ffmi;
       const bmr = metrics.bmr_kcal;
       return `
     <div class="card">
@@ -351,21 +344,9 @@ function render(d) {
         <span class="stat-value">~${bf.estimate}%</span>
       </div>
       <div class="stat-sub" style="text-align:left">
-        ${bf.navy ? `Navy ${bf.navy.value}%` : ''}${bf.rfm ? ` · RFM ${bf.rfm.value}%` : ''}${bf.deurenberg ? ` · Deurenberg ${bf.deurenberg.value}%` : ''}
+        ${bf.navy ? `Navy ${bf.navy.value}%` : ''}${bf.rfm ? ` · RFM ${bf.rfm.value}%` : ''}
       </div>
-      <div class="stat-sub" style="text-align:left; font-style:italic">Midpoint of Navy (biases low for muscular) and mean(RFM, Deurenberg) (bias high)</div>
-      ` : ''}
-      ${lbm ? `
-      <div class="stat-row">
-        <span class="stat-label">Lean body mass</span>
-        <span class="stat-value">${lbm.value} lbs</span>
-      </div>
-      ` : ''}
-      ${ffmi ? `
-      <div class="stat-row">
-        <span class="stat-label">FFMI</span>
-        <span class="stat-value">${ffmi.value}</span>
-      </div>
+      <div class="stat-sub" style="text-align:left; font-style:italic">Midpoint of Navy (biases low for muscular) and RFM (biases high)</div>
       ` : ''}
       ${bmi ? `
       <div class="stat-row">
@@ -390,6 +371,7 @@ function render(d) {
         <span class="stat-label">BMR</span>
         <span class="stat-value">${bmr.value} kcal</span>
       </div>
+      <div class="stat-sub" style="text-align:left">${bmr.method}</div>
       ` : ''}
     </div>
       `;
@@ -398,7 +380,7 @@ function render(d) {
 
     ${creatine ? (() => {
       const status = creatineStatus(creatine.loading_pct);
-      const change = creatine.change_pct_7d;
+      const change = creatine.change_pct_14d;
       return `
     <div class="card">
       <div class="card-header">Creatine Loading</div>
@@ -410,7 +392,7 @@ function render(d) {
         </span>
       </div>
       <div class="stat-sub">
-        7d ago ${creatine.loading_pct_7d_ago}%
+        14d ago ${creatine.loading_pct_14d_ago}%
         ${change != null && change !== 0 ? `<span class="badge ${deltaClass(change, false)}">${fmtDelta(change, '%')}</span>` : ''}
       </div>
       ${creatine.days_to_boost != null && creatine.loading_pct < 70 ? `
@@ -464,8 +446,10 @@ function render(d) {
       const r = oura.readiness;
       const sl = oura.sleep;
       const det = sl?.detail;
-      const s = det?.latest_session;
-      const totalHrs = s?.total_sleep_min != null ? (s.total_sleep_min / 60).toFixed(1) : null;
+      const nb = det?.night_before;
+      const avg = det?.averages_7d;
+      const totalHrs = nb?.total_sleep_min != null ? (nb.total_sleep_min / 60).toFixed(1) : null;
+      const nbDate = nb?.day ? new Date(nb.day + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : null;
       return `
     <div class="card">
       <div class="card-header">Oura</div>
@@ -477,36 +461,47 @@ function render(d) {
       ` : ''}
       ${sl ? `
       <div class="stat-row">
-        <span class="stat-label">Sleep</span>
+        <span class="stat-label">Sleep score</span>
         <span class="stat-value">${sl.today_score ?? sl.latest_score ?? '—'} <span style="font-weight:400;color:var(--text-secondary);font-size:13px">/ 7d ${sl.avg_7d ?? '—'}</span></span>
       </div>
       ` : ''}
-      ${s ? `
+      ${nb ? `
+      <div class="stat-sub" style="text-align:left">Night before${nbDate ? ` — ${nbDate}` : ''}</div>
       <div class="sleep-grid">
         <div class="sleep-cell">
           <div class="val">${totalHrs != null ? totalHrs + 'h' : '—'}</div>
-          <div class="lbl">Sleep</div>
+          <div class="lbl">Sleep${avg?.total_sleep_hours != null ? `<br><span style="font-size:10px;opacity:.7">7d ${avg.total_sleep_hours}h</span>` : ''}</div>
         </div>
         <div class="sleep-cell">
-          <div class="val">${s.deep_sleep_min != null ? s.deep_sleep_min + 'm' : '—'}</div>
-          <div class="lbl">Deep</div>
+          <div class="val">${nb.deep_sleep_min != null ? nb.deep_sleep_min + 'm' : '—'}</div>
+          <div class="lbl">Deep${avg?.deep_sleep_min != null ? `<br><span style="font-size:10px;opacity:.7">7d ${avg.deep_sleep_min}m</span>` : ''}</div>
         </div>
         <div class="sleep-cell">
-          <div class="val">${s.rem_sleep_min != null ? s.rem_sleep_min + 'm' : '—'}</div>
-          <div class="lbl">REM</div>
+          <div class="val">${nb.rem_sleep_min != null ? nb.rem_sleep_min + 'm' : '—'}</div>
+          <div class="lbl">REM${avg?.rem_sleep_min != null ? `<br><span style="font-size:10px;opacity:.7">7d ${avg.rem_sleep_min}m</span>` : ''}</div>
         </div>
         <div class="sleep-cell">
-          <div class="val">${s.average_hrv != null ? Math.round(s.average_hrv) : '—'}</div>
-          <div class="lbl">HRV</div>
+          <div class="val">${nb.average_hrv != null ? Math.round(nb.average_hrv) : '—'}</div>
+          <div class="lbl">HRV${avg?.average_hrv != null ? `<br><span style="font-size:10px;opacity:.7">7d ${Math.round(avg.average_hrv)}</span>` : ''}</div>
         </div>
         <div class="sleep-cell">
-          <div class="val">${s.average_heart_rate != null ? Math.round(s.average_heart_rate) : '—'}</div>
-          <div class="lbl">Avg HR</div>
+          <div class="val">${nb.average_heart_rate != null ? Math.round(nb.average_heart_rate) : '—'}</div>
+          <div class="lbl">Avg HR${avg?.lowest_heart_rate != null ? `<br><span style="font-size:10px;opacity:.7">7d low ${Math.round(avg.lowest_heart_rate)}</span>` : ''}</div>
         </div>
         <div class="sleep-cell">
-          <div class="val">${s.efficiency != null ? s.efficiency + '%' : '—'}</div>
-          <div class="lbl">Eff.</div>
+          <div class="val">${nb.efficiency != null ? nb.efficiency + '%' : '—'}</div>
+          <div class="lbl">Eff.${avg?.efficiency != null ? `<br><span style="font-size:10px;opacity:.7">7d ${avg.efficiency}%</span>` : ''}</div>
         </div>
+      </div>
+      ` : avg ? `
+      <div class="stat-sub" style="text-align:left">${det?.night_before_missing_note ?? 'No session for the night before — showing 7d averages.'}</div>
+      <div class="sleep-grid">
+        <div class="sleep-cell"><div class="val">${avg.total_sleep_hours != null ? avg.total_sleep_hours + 'h' : '—'}</div><div class="lbl">Sleep 7d</div></div>
+        <div class="sleep-cell"><div class="val">${avg.deep_sleep_min != null ? avg.deep_sleep_min + 'm' : '—'}</div><div class="lbl">Deep 7d</div></div>
+        <div class="sleep-cell"><div class="val">${avg.rem_sleep_min != null ? avg.rem_sleep_min + 'm' : '—'}</div><div class="lbl">REM 7d</div></div>
+        <div class="sleep-cell"><div class="val">${avg.average_hrv != null ? Math.round(avg.average_hrv) : '—'}</div><div class="lbl">HRV 7d</div></div>
+        <div class="sleep-cell"><div class="val">${avg.lowest_heart_rate != null ? Math.round(avg.lowest_heart_rate) : '—'}</div><div class="lbl">Low HR 7d</div></div>
+        <div class="sleep-cell"><div class="val">${avg.efficiency != null ? avg.efficiency + '%' : '—'}</div><div class="lbl">Eff. 7d</div></div>
       </div>
       ` : ''}
     </div>
