@@ -217,6 +217,20 @@ function render(d) {
       const basisText = rate
         ? `${rate.basis} · n=${rate.data_points}${rate.r_squared != null ? ` · R²=${rate.r_squared}` : ''}`
         : '';
+      const recent = w.recent_shift ?? null;
+      const recentVal = recent?.lbs_per_week;
+      const recentInterp = recent?.interpretation ?? null;
+      const recentInterpBadge = recentInterp ? {
+        losing: 'losing', gaining: 'gaining', flat: 'flat',
+        unclear: 'unclear', insufficient_data: 'insufficient',
+      }[recentInterp] : null;
+      const recentInterpLabel = recentInterp ? {
+        losing: 'Losing', gaining: 'Gaining', flat: 'Flat',
+        unclear: 'Unclear', insufficient_data: 'Insufficient',
+      }[recentInterp] : null;
+      const recentText = recentVal != null
+        ? `${recentVal > 0 ? '+' : ''}${recentVal.toFixed(2)} lbs/wk`
+        : null;
       const proj = w.projection ?? null;
       const confidenceLabel = {
         high: 'High confidence', moderate: 'Moderate confidence',
@@ -239,7 +253,7 @@ function render(d) {
         <span class="stat-value">${w.moving_avg_lbs} lbs</span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">Weekly rate</span>
+        <span class="stat-label">Rate (30d)</span>
         <span class="stat-value">
           ${rateText}
           <span class="badge ${interpBadge}">${interpLabel}</span>
@@ -247,6 +261,15 @@ function render(d) {
       </div>
       ${bandText || basisText ? `
       <div class="stat-sub">${[bandText, basisText].filter(Boolean).join(' · ')}</div>
+      ` : ''}
+      ${recentText ? `
+      <div class="stat-row">
+        <span class="stat-label">Recent 14d</span>
+        <span class="stat-value">
+          ${recentText}
+          <span class="badge ${recentInterpBadge}">${recentInterpLabel}</span>
+        </span>
+      </div>
       ` : ''}
       ${proj ? `
       <div class="stat-row">
