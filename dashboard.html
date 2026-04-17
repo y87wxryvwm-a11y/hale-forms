@@ -114,6 +114,28 @@
     font-size: 12px; color: var(--text-secondary); margin-top: 6px;
   }
 
+  details.card { padding: 14px 16px; }
+  details.card > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary .summary-title {
+    font-size: 12px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  details.card > summary .summary-sub {
+    font-size: 11px; font-weight: 500; color: var(--text-secondary);
+    text-transform: none; letter-spacing: 0; margin-left: 6px;
+  }
+  details.card > summary .toggle {
+    font-size: 13px; font-weight: 600; color: var(--accent);
+  }
+  details.card[open] > summary { margin-bottom: 10px; }
+  details.card .when-open { display: none; }
+  details.card[open] .when-closed { display: none; }
+  details.card[open] .when-open { display: inline; }
+
   .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
   .refresh-btn {
     display: block; width: 100%; padding: 12px; margin-top: 8px;
@@ -412,8 +434,14 @@ function render(d) {
       `;
     })() : ''}
 
-    <div class="card">
-      <div class="card-header">GLP-1</div>
+    <details class="card">
+      <summary>
+        <span>
+          <span class="summary-title">GLP-1</span>
+          <span class="summary-sub">Zepbound · tirzepatide</span>
+        </span>
+        <span class="toggle"><span class="when-closed">Show</span><span class="when-open">Hide</span></span>
+      </summary>
       <div class="stat-row">
         <span class="stat-label">Dose</span>
         <span class="stat-value">${glp1?.current_dose_mg ?? '—'} mg</span>
@@ -440,7 +468,7 @@ function render(d) {
         <span class="stat-label">Adherence</span>
         <span class="stat-value">${glp1?.adherence_pct ?? '—'}%</span>
       </div>
-    </div>
+    </details>
 
     ${oura ? (() => {
       const r = oura.readiness;
