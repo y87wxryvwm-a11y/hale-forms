@@ -212,26 +212,36 @@ function render(d) {
 
     <div class="card">
       <div class="card-header">Oura — Today</div>
-      ${oura?.readiness ? `
+      ${oura?.readiness ? (() => {
+        const r = oura.readiness;
+        const score = r.today_score != null ? r.today_score : (r.latest_score != null ? r.latest_score : null);
+        const isStale = r.today_score == null && r.latest_score != null;
+        return `
       <div class="stat-row">
         <span class="stat-label">Readiness</span>
         <span class="stat-value">
-          ${oura.readiness.today_score != null ? oura.readiness.today_score : '—'}
-          <span style="font-weight:400; font-size:13px; color:var(--text-secondary)"> / avg ${oura.readiness.avg_7d}</span>
-          ${oura.readiness.trend ? `<span class="badge ${oura.readiness.trend}">${oura.readiness.trend}</span>` : ''}
+          ${score != null ? score : '—'}
+          ${isStale ? `<span style="font-weight:400; font-size:11px; color:var(--text-secondary); margin-left:4px">(${r.stale_days}d ago)</span>` : ''}
+          <span style="font-weight:400; font-size:13px; color:var(--text-secondary)"> / avg ${r.avg_7d}</span>
+          ${r.trend ? `<span class="badge ${r.trend}">${r.trend}</span>` : ''}
         </span>
       </div>
-      ` : ''}
-      ${oura?.sleep ? `
+      `;})() : ''}
+      ${oura?.sleep ? (() => {
+        const sl = oura.sleep;
+        const score = sl.today_score != null ? sl.today_score : (sl.latest_score != null ? sl.latest_score : null);
+        const isStale = sl.today_score == null && sl.latest_score != null;
+        return `
       <div class="stat-row">
         <span class="stat-label">Sleep score</span>
         <span class="stat-value">
-          ${oura.sleep.today_score != null ? oura.sleep.today_score : '—'}
-          <span style="font-weight:400; font-size:13px; color:var(--text-secondary)"> / avg ${oura.sleep.avg_7d}</span>
-          ${oura.sleep.trend ? `<span class="badge ${oura.sleep.trend}">${oura.sleep.trend}</span>` : ''}
+          ${score != null ? score : '—'}
+          ${isStale ? `<span style="font-weight:400; font-size:11px; color:var(--text-secondary); margin-left:4px">(${sl.stale_days}d ago)</span>` : ''}
+          <span style="font-weight:400; font-size:13px; color:var(--text-secondary)"> / avg ${sl.avg_7d}</span>
+          ${sl.trend ? `<span class="badge ${sl.trend}">${sl.trend}</span>` : ''}
         </span>
       </div>
-      ` : ''}
+      `;})() : ''}
       ${(() => {
         const det = oura?.sleep?.detail;
         if (!det?.latest_session) return '';
