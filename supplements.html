@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Supplements · Project Hale</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --surface: #f8fafc; --border: #e2e8f0;
+    --text: #0f172a; --text-secondary: #64748b; --accent: #3b82f6;
+    --accent-hover: #2563eb; --success: #10b981; --warning: #f59e0b;
+    --danger: #ef4444; --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --text: #f1f5f9; --text-secondary: #94a3b8; --accent: #60a5fa;
+      --accent-hover: #3b82f6; --success: #34d399; --warning: #fbbf24;
+      --danger: #f87171;
+      --shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding: env(safe-area-inset-top) 16px 32px;
+    max-width: 420px; margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { display: flex; align-items: center; gap: 8px; margin: 16px 0 20px; }
+  header a { color: var(--accent); text-decoration: none; font-size: 15px; font-weight: 600; }
+  h1 { font-size: 22px; font-weight: 700; }
+
+  .section-label {
+    font-size: 11px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.5px; margin: 22px 0 10px;
+  }
+
+  /* Gauge */
+  .gauge-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    margin-bottom: 12px;
+  }
+  .gauge-svg { width: 220px; height: 130px; }
+  .gauge-bg { fill: none; stroke: var(--border); stroke-width: 14; stroke-linecap: round; }
+  .gauge-fill { fill: none; stroke-width: 14; stroke-linecap: round;
+    transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease; }
+  .gauge-tick { stroke: var(--text); stroke-width: 2; opacity: 0.55; }
+  .gauge-pct { font-size: 38px; font-weight: 700; margin-top: -8px; transition: color 0.6s ease; }
+  .gauge-status {
+    font-size: 14px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; margin-top: 4px; transition: color 0.6s ease;
+  }
+  .gauge-label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  /* Info row */
+  .info-row {
+    display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 6px 18px; margin-bottom: 18px; font-size: 13px;
+    color: var(--text-secondary); text-align: center;
+  }
+  .info-row strong { color: var(--text); font-weight: 600; }
+
+  /* Quick log */
+  .log-form { margin-bottom: 4px; }
+  .log-row { display: flex; gap: 10px; margin-bottom: 8px; }
+  .log-form input {
+    flex: 1; padding: 12px 14px; font-size: 16px; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    outline: none; -webkit-appearance: none; appearance: none;
+    transition: border-color 0.15s;
+  }
+  .log-form input:focus { border-color: var(--accent); }
+  .log-form button {
+    padding: 12px 20px; font-size: 15px; font-weight: 600;
+    background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+    cursor: pointer; white-space: nowrap; transition: background 0.15s;
+  }
+  .log-form button:active { background: var(--accent-hover); transform: scale(0.99); }
+  .log-form button:disabled { opacity: 0.5; }
+  .when-row {
+    display: flex; align-items: center; gap: 8px; font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .when-row input { flex: 1; padding: 8px 10px; font-size: 13px; }
+  .when-row a {
+    color: var(--accent); cursor: pointer; text-decoration: none; font-weight: 600;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--success); color: #fff; padding: 12px 24px;
+    border-radius: var(--radius); font-weight: 600; font-size: 15px;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Card */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 14px 14px 10px; margin-bottom: 14px;
+  }
+
+  /* Taper chart */
+  .taper-title {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;
+  }
+  .taper-title strong { color: var(--text); font-weight: 600; }
+  .taper-svg { width: 100%; height: 140px; display: block; }
+  .taper-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 3; }
+  .taper-ref { stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.55; }
+  .taper-ref-70 { stroke: var(--warning); }
+  .taper-ref-88 { stroke: var(--success); }
+  .taper-line {
+    fill: none; stroke: var(--accent); stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+  }
+  .taper-area { fill: var(--accent); opacity: 0.1; }
+  .taper-dot { fill: var(--accent); stroke: var(--bg); stroke-width: 1.5; }
+  .taper-dot.zero { fill: var(--border); }
+  .taper-label { fill: var(--text-secondary); font-size: 10px; }
+
+  /* History list */
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .history-item:last-child { border-bottom: none; }
+  .hist-left { display: flex; flex-direction: column; gap: 2px; }
+  .hist-date { font-size: 14px; font-weight: 600; color: var(--text); }
+  .hist-time { font-size: 12px; color: var(--text-secondary); }
+  .hist-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .hist-pct { font-size: 15px; font-weight: 600; color: var(--text); }
+  .hist-delta { font-size: 12px; color: var(--text-secondary); }
+  .hist-delta.up { color: var(--success); }
+  .hist-grams {
+    display: inline-block; padding: 2px 8px; margin-left: 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
+    font-size: 12px; font-weight: 600; color: var(--text);
+  }
+
+  .info-note {
+    font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+    padding: 2px 2px;
+  }
+  .info-note strong { color: var(--text); font-weight: 600; }
+  .info-note + .info-note { margin-top: 6px; }
+
+  .loading-msg { text-align: center; padding: 20px; color: var(--text-secondary); font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">← Back</a>
+  <h1 style="margin-left: auto; margin-right: auto;">Supplements</h1>
+</header>
+
+<div id="creatine">
+  <div class="loading-msg">Loading creatine data...</div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const API = 'https://qeymdlmidqagaldwymqu.supabase.co/functions/v1/creatine-log';
+let state = null;
+
+function gaugeColor(pct) {
+  if (pct >= 70) return 'var(--success)';
+  if (pct >= 30) return 'var(--warning)';
+  return 'var(--danger)';
+}
+function statusLabel(pct) {
+  if (pct >= 88) return { text: 'MAX BOOSTO', color: 'var(--success)' };
+  if (pct >= 70) return { text: 'BOOSTO', color: 'var(--success)' };
+  if (pct >= 30) return { text: 'Approaching boost', color: 'var(--warning)' };
+  return { text: 'Building', color: 'var(--text-secondary)' };
+}
+function nowLocalDatetime() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+function hoursSince(iso) {
+  if (!iso) return null;
+  const h = (Date.now() - new Date(iso).getTime()) / 3600000;
+  return h;
+}
+function humanSince(iso) {
+  const h = hoursSince(iso);
+  if (h == null) return '';
+  if (h < 1) return Math.max(1, Math.round(h * 60)) + 'm ago';
+  if (h < 24) return Math.round(h) + 'h ago';
+  const d = Math.round(h / 24);
+  return d === 1 ? 'yesterday' : d + 'd ago';
+}
+function shortDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
+}
+function shortDateFromYMD(ymd) {
+  const [y, m, day] = ymd.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1, day, 12));
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function renderGauge(pct) {
+  const color = gaugeColor(pct);
+  const status = statusLabel(pct);
+  const cx = 110, cy = 110, radius = 90;
+  const circumference = Math.PI * radius;
+  const filled = circumference * (Math.min(100, pct) / 100);
+  const dashoffset = circumference - filled;
+  const tickAngle = (180 - (70 / 100) * 180) * Math.PI / 180;
+  const tickInner = 82, tickOuter = 98;
+  const tx1 = cx + tickInner * Math.cos(tickAngle);
+  const ty1 = cy - tickInner * Math.sin(tickAngle);
+  const tx2 = cx + tickOuter * Math.cos(tickAngle);
+  const ty2 = cy - tickOuter * Math.sin(tickAngle);
+  return `
+    <div class="gauge-wrap">
+      <svg class="gauge-svg" viewBox="0 0 220 130">
+        <path class="gauge-bg" d="M 20 110 A 90 90 0 0 1 200 110" />
+        <path class="gauge-fill" d="M 20 110 A 90 90 0 0 1 200 110"
+          stroke="${color}"
+          stroke-dasharray="${circumference}"
+          stroke-dashoffset="${dashoffset}" />
+        <line class="gauge-tick" x1="${tx1.toFixed(1)}" y1="${ty1.toFixed(1)}" x2="${tx2.toFixed(1)}" y2="${ty2.toFixed(1)}" />
+      </svg>
+      <div class="gauge-pct" style="color:${color}">${pct}%</div>
+      <div class="gauge-status" style="color:${status.color}">${status.text}</div>
+      <div class="gauge-label">Creatine Loading · tick = boost zone</div>
+    </div>
+  `;
+}
+
+function renderTaper(taper) {
+  if (!taper || taper.length < 2) {
+    return `<div class="info-note" style="text-align:center">Taper curve appears after a few days of data.</div>`;
+  }
+  const W = 388, H = 140;
+  const padL = 28, padR = 8, padT = 10, padB = 20;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const n = taper.length;
+  const xAt = (i) => padL + (n === 1 ? plotW / 2 : (i * plotW) / (n - 1));
+  const yAt = (pct) => padT + plotH - (Math.max(0, Math.min(100, pct)) / 100) * plotH;
+
+  const linePts = taper.map((d, i) => `${xAt(i).toFixed(1)},${yAt(d.loading_pct).toFixed(1)}`);
+  const areaPts = [`${xAt(0).toFixed(1)},${yAt(0).toFixed(1)}`, ...linePts, `${xAt(n - 1).toFixed(1)},${yAt(0).toFixed(1)}`];
+
+  const yLabels = [0, 50, 100];
+  const grid = yLabels.map(v => `
+    <line class="taper-grid" x1="${padL}" x2="${W - padR}" y1="${yAt(v).toFixed(1)}" y2="${yAt(v).toFixed(1)}" />
+    <text class="taper-label" x="${padL - 4}" y="${(yAt(v) + 3).toFixed(1)}" text-anchor="end">${v}</text>
+  `).join('');
+
+  const ref70 = `<line class="taper-ref taper-ref-70" x1="${padL}" x2="${W - padR}" y1="${yAt(70).toFixed(1)}" y2="${yAt(70).toFixed(1)}" />`;
+  const ref88 = `<line class="taper-ref taper-ref-88" x1="${padL}" x2="${W - padR}" y1="${yAt(88).toFixed(1)}" y2="${yAt(88).toFixed(1)}" />`;
+
+  const dots = taper.map((d, i) => {
+    const r = d.dose_grams > 0 ? Math.min(6, 2.2 + Math.sqrt(d.dose_grams)) : 2.2;
+    const cls = d.dose_grams > 0 ? 'taper-dot' : 'taper-dot zero';
+    return `<circle class="${cls}" cx="${xAt(i).toFixed(1)}" cy="${yAt(d.loading_pct).toFixed(1)}" r="${r.toFixed(1)}" />`;
+  }).join('');
+
+  // Date labels at first, middle, last
+  const dateIdx = [0, Math.floor((n - 1) / 2), n - 1];
+  const dateLabels = [...new Set(dateIdx)].map(i => `
+    <text class="taper-label" x="${xAt(i).toFixed(1)}" y="${(H - 4).toFixed(1)}" text-anchor="middle">${shortDateFromYMD(taper[i].date)}</text>
+  `).join('');
+
+  return `
+    <div class="taper-title">
+      <span><strong>${n}-day taper</strong> · % of pool range</span>
+      <span>70% <span style="color:var(--warning)">—</span> · 88% <span style="color:var(--success)">—</span></span>
+    </div>
+    <svg class="taper-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${grid}
+      ${ref70}
+      ${ref88}
+      <polygon class="taper-area" points="${areaPts.join(' ')}" />
+      <polyline class="taper-line" points="${linePts.join(' ')}" />
+      ${dots}
+      ${dateLabels}
+    </svg>
+  `;
+}
+
+function renderHistory(history) {
+  if (!history || history.length === 0) {
+    return `<div class="info-note" style="text-align:center">No doses logged yet.</div>`;
+  }
+  return history.map(h => {
+    const deltaSign = h.delta_pct > 0 ? '+' : '';
+    const deltaClass = h.delta_pct > 0 ? 'hist-delta up' : 'hist-delta';
+    return `
+      <div class="history-item">
+        <div class="hist-left">
+          <div class="hist-date">${shortDateFromYMD(h.date)}<span class="hist-grams">${h.grams}g</span></div>
+          <div class="hist-time">${h.time}</div>
+        </div>
+        <div class="hist-right">
+          <div class="hist-pct">${h.loading_pct_after}%</div>
+          <div class="${deltaClass}">${deltaSign}${h.delta_pct}%</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function render() {
+  const el = document.getElementById('creatine');
+  if (!state) {
+    el.innerHTML = '<div class="loading-msg">Could not load creatine data.</div>';
+    return;
+  }
+  const pct = state.loading_pct;
+  const lastIso = state.last_dose?.iso ?? null;
+  const streak = state.streak_days ?? 0;
+  let infoHtml = '';
+  if (streak > 0) {
+    infoHtml += `<span><strong>${streak}</strong> day${streak === 1 ? '' : 's'} in a row</span>`;
+  }
+  if (lastIso) {
+    infoHtml += `<span>Last: <strong>${humanSince(lastIso)}</strong></span>`;
+  }
+  if (pct < 70 && state.days_to_boost != null) {
+    infoHtml += `<span><strong>~${state.days_to_boost}d</strong> to BOOSTO at 5g/day</span>`;
+  } else if (pct >= 70 && pct < 88 && state.days_to_max != null) {
+    infoHtml += `<span><strong>~${state.days_to_max}d</strong> to MAX BOOSTO at 5g/day</span>`;
+  }
+
+  el.innerHTML = `
+    ${renderGauge(pct)}
+    ${infoHtml ? `<div class="info-row">${infoHtml}</div>` : ''}
+
+    <form class="log-form" id="logForm">
+      <div class="log-row">
+        <input type="number" id="doseInput" value="5" step="0.5" min="0.5" max="30"
+          inputmode="decimal" placeholder="grams">
+        <button type="submit" id="logBtn">Log Creatine</button>
+      </div>
+      <div class="when-row">
+        <span>When:</span>
+        <input type="datetime-local" id="whenInput" value="${nowLocalDatetime()}">
+        <a id="resetWhen">now</a>
+      </div>
+    </form>
+
+    <div class="section-label">Pool over time</div>
+    <div class="card">${renderTaper(state.taper)}</div>
+
+    <div class="section-label">Recent doses</div>
+    <div class="card">${renderHistory(state.recent_history)}</div>
+
+    <div class="section-label">About creatine loading</div>
+    <div class="card">
+      <div class="info-note">
+        <strong>Model.</strong> Saturable pool of supplemental muscle creatine above baseline.
+        Range scales with body weight (~0.2 g/lb → ${state.supplement_range ?? '—'}g at your current weight).
+        Each dose fills the gap toward the range; uptake slows as the pool fills.
+      </div>
+      <div class="info-note">
+        <strong>Taper.</strong> Pool decays 1.7%/day at midnight (ET) without reloading — matches stable-isotope washout (~40-day half-life).
+      </div>
+      <div class="info-note">
+        <strong>Zones.</strong> 0-30% Building · 30-70% Approaching · 70-88% BOOSTO · 88%+ MAX.
+        88% is the realistic ceiling at 5g/day maintenance; 95%+ requires loading doses.
+      </div>
+      <div class="info-note">
+        <strong>Streak.</strong> Two doses count as consecutive if taken within 36h — so a late-night dose followed by the next morning still chains.
+      </div>
+    </div>
+  `;
+
+  document.getElementById('logForm').addEventListener('submit', submitDose);
+  document.getElementById('resetWhen').addEventListener('click', () => {
+    document.getElementById('whenInput').value = nowLocalDatetime();
+  });
+}
+
+async function load() {
+  try {
+    const resp = await fetch(API + '?json=1');
+    state = await resp.json();
+  } catch (e) {
+    state = null;
+  }
+  render();
+}
+
+async function submitDose(e) {
+  e.preventDefault();
+  const btn = document.getElementById('logBtn');
+  const input = document.getElementById('doseInput');
+  const dose = parseFloat(input.value);
+  if (isNaN(dose) || dose <= 0) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Logging...';
+
+  try {
+    const whenVal = document.getElementById('whenInput').value;
+    const payload = { dose_grams: dose };
+    if (whenVal) payload.datetime = new Date(whenVal).toISOString();
+    const resp = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('Failed');
+    const result = await resp.json();
+
+    const toast = document.getElementById('toast');
+    const delta = result.delta_pct > 0 ? `+${result.delta_pct}%` : `${result.delta_pct}%`;
+    toast.textContent = `Logged ${dose}g! ${delta}`;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+
+    const freshResp = await fetch(API + '?json=1');
+    state = await freshResp.json();
+    render();
+  } catch (err) {
+    alert('Error logging creatine. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Log Creatine';
+  }
+}
+
+load();
+</script>
+</body>
+</html>
