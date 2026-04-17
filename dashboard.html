@@ -189,6 +189,7 @@ function render(d) {
   const bicep = d.body_composition?.latest_bicep;
   const dexa = d.body_composition?.latest_dexa;
   const measurements = d.body_composition?.measurements || {};
+  const metrics = d.body_composition?.metrics;
   const creatine = d.creatine;
 
   document.getElementById('app').innerHTML = `
@@ -395,6 +396,98 @@ function render(d) {
       ${Object.values(measurements).every(m => m == null) ? '<div class="stat-sub" style="text-align:left">No measurements logged yet.</div>' : ''}
     </div>
 
+    ${metrics ? (() => {
+      const bmi = metrics.bmi;
+      const whtr = metrics.waist_to_height;
+      const whr = metrics.waist_to_hip;
+      const bf = metrics.body_fat_pct || {};
+      const lbm = metrics.lean_body_mass_lbs;
+      const ffmi = metrics.ffmi;
+      const bmr = metrics.bmr_kcal;
+      const bmiBadge = bmi?.category === 'normal' ? 'on-track'
+        : bmi?.category === 'overweight' ? 'stale'
+        : bmi?.category === 'obese' ? 'behind'
+        : bmi?.category === 'underweight' ? 'stale' : 'flat';
+      const ratioBadge = (val, max) => val == null ? 'flat' : val < max ? 'on-track' : 'behind';
+      return `
+    <div class="card">
+      <div class="card-header">Body Composition Metrics</div>
+      ${bmi ? `
+      <div class="stat-row">
+        <span class="stat-label">BMI</span>
+        <span class="stat-value">${bmi.value}
+          ${bmi.category ? `<span class="badge ${bmiBadge}">${bmi.category}</span>` : ''}
+        </span>
+      </div>
+      ` : ''}
+      ${whtr ? `
+      <div class="stat-row">
+        <span class="stat-label">Waist : Height</span>
+        <span class="stat-value">${whtr.value}
+          ${whtr.interpretation ? `<span class="badge ${ratioBadge(whtr.value, whtr.target_max)}">${whtr.interpretation}</span>` : ''}
+        </span>
+      </div>
+      <div class="stat-sub">target &lt; ${whtr.target_max}</div>
+      ` : ''}
+      ${whr ? `
+      <div class="stat-row">
+        <span class="stat-label">Waist : Hip</span>
+        <span class="stat-value">${whr.value}
+          ${whr.interpretation ? `<span class="badge ${ratioBadge(whr.value, whr.target_max)}">${whr.interpretation}</span>` : ''}
+        </span>
+      </div>
+      <div class="stat-sub">target &lt; ${whr.target_max}</div>
+      ` : ''}
+      ${(bf.navy || bf.rfm || bf.deurenberg) ? `
+      <div class="sleep-section-title">Body Fat %</div>
+      <div class="sleep-grid">
+        ${bf.navy ? `
+        <div class="sleep-cell">
+          <div class="val">${bf.navy.value}%</div>
+          <div class="lbl">Navy</div>
+          ${bf.navy.se_pp ? `<div class="avg">±${bf.navy.se_pp}pp</div>` : ''}
+        </div>
+        ` : ''}
+        ${bf.rfm ? `
+        <div class="sleep-cell">
+          <div class="val">${bf.rfm.value}%</div>
+          <div class="lbl">RFM</div>
+        </div>
+        ` : ''}
+        ${bf.deurenberg ? `
+        <div class="sleep-cell">
+          <div class="val">${bf.deurenberg.value}%</div>
+          <div class="lbl">Deurenberg</div>
+        </div>
+        ` : ''}
+      </div>
+      ${bf.dexa_reference ? `<div class="stat-sub" style="text-align:left">DEXA ${bf.dexa_reference.value}% · ${bf.dexa_reference.age_days}d old</div>` : ''}
+      ` : ''}
+      ${lbm ? `
+      <div class="stat-row">
+        <span class="stat-label">Lean body mass</span>
+        <span class="stat-value">${lbm.value} lbs</span>
+      </div>
+      ` : ''}
+      ${ffmi ? `
+      <div class="stat-row">
+        <span class="stat-label">FFMI</span>
+        <span class="stat-value">${ffmi.value}
+          ${ffmi.interpretation ? `<span class="badge flat">${ffmi.interpretation}</span>` : ''}
+        </span>
+      </div>
+      ` : ''}
+      ${bmr ? `
+      <div class="stat-row">
+        <span class="stat-label">BMR</span>
+        <span class="stat-value">${bmr.value} kcal</span>
+      </div>
+      <div class="stat-sub">Mifflin-St Jeor</div>
+      ` : ''}
+    </div>
+      `;
+    })() : ''}
+
     ${dexa ? `
     <div class="card">
       <div class="card-header">DEXA Scan</div>
@@ -480,32 +573,25 @@ function render(d) {
       <div class="card-header">Goal Progress</div>
       ${goals.map(g => {
         const unit = g.metric.includes('lbs') ? ' lbs' : g.metric.includes('pct') ? '%' : '"';
-        const hasRange = Array.isArray(g.current_range);
         const onTrackBadge = g.on_track === true
           ? '<span class="badge on-track">On Track</span>'
           : g.on_track === false
             ? '<span class="badge behind">Behind</span>'
-            : hasRange
-              ? '<span class="badge stale">Uncertain</span>'
-              : '';
+            : '';
         return `
         <div class="goal-item">
           <div class="goal-top">
             <span class="goal-label">${g.target_label}</span>
             ${onTrackBadge}
           </div>
-          ${hasRange ? `
-            <div class="goal-detail">
-              Now: ~${g.current_range[0]}–${g.current_range[1]}${unit}
-              ${g.note ? ` — ${g.note}` : ''}
-            </div>
-            ${g.method_label ? `<div class="goal-detail" style="font-style:italic">est. ${g.method_label}</div>` : ''}
-          ` : g.current != null ? `
+          ${g.current != null ? `
             <div class="goal-detail">
               Now: ${g.current}${unit}
-              ${g.gap != null ? ` — ${Math.abs(g.gap)}${unit} to go` : ''}
+              ${g.gap != null ? ` — ${Math.abs(g.gap)}${unit} ${g.on_track ? 'under target' : 'to go'}` : ''}
               ${g.projected_date ? ` — est. ${new Date(g.projected_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
             </div>
+            ${g.method_label ? `<div class="goal-detail" style="font-style:italic">via ${g.method_label}</div>` : ''}
+            ${g.triangulation ? `<div class="goal-detail">Triangulation: Navy ${g.triangulation.navy}% · RFM ${g.triangulation.rfm}% · Deurenberg ${g.triangulation.deurenberg}%${g.triangulation.dexa ? ` · DEXA ${g.triangulation.dexa}% (${g.triangulation.dexa_age_days}d)` : ''}</div>` : ''}
           ` : g.note ? `<div class="goal-detail">${g.note}</div>` : ''}
         </div>
         `;
