@@ -63,6 +63,19 @@
   .badge.flat { background: var(--border); color: var(--text-secondary); }
   .badge.up { background: var(--success); color: #fff; }
   .badge.down { background: var(--warning); color: #000; }
+  .badge.losing { background: var(--success); color: #fff; }
+  .badge.gaining { background: var(--danger); color: #fff; }
+  .badge.unclear { background: var(--warning); color: #000; }
+  .badge.insufficient { background: var(--border); color: var(--text-secondary); }
+  .badge.high { background: var(--success); color: #fff; }
+  .badge.moderate { background: var(--warning); color: #000; }
+  .badge.low { background: var(--border); color: var(--text-secondary); }
+
+  .confounder-note {
+    font-size: 12px; color: var(--text-secondary);
+    background: var(--bg); border-left: 3px solid var(--warning);
+    padding: 6px 10px; margin-top: 8px; border-radius: 4px;
+  }
 
   .goal-item {
     padding: 10px 0; border-bottom: 1px solid var(--border);
@@ -182,7 +195,39 @@ function render(d) {
     <h1>Dashboard</h1>
     <div class="subtitle">Project Hale — ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</div>
 
-    ${w ? `
+    ${w ? (() => {
+      const rate = w.rate ?? null;
+      const rateVal = rate?.lbs_per_week;
+      const band = rate?.band_lbs_per_week;
+      const interp = rate?.interpretation ?? 'insufficient_data';
+      const interpBadge = {
+        losing: 'losing', gaining: 'gaining', flat: 'flat',
+        unclear: 'unclear', insufficient_data: 'insufficient',
+      }[interp];
+      const interpLabel = {
+        losing: 'Losing', gaining: 'Gaining', flat: 'Flat',
+        unclear: 'Unclear', insufficient_data: 'Insufficient',
+      }[interp];
+      const rateText = rateVal != null
+        ? `${rateVal > 0 ? '+' : ''}${rateVal.toFixed(2)} lbs/wk`
+        : '—';
+      const bandText = band
+        ? `band ${band[0] > 0 ? '+' : ''}${band[0].toFixed(2)} to ${band[1] > 0 ? '+' : ''}${band[1].toFixed(2)}`
+        : '';
+      const basisText = rate
+        ? `${rate.basis} · n=${rate.data_points}${rate.r_squared != null ? ` · R²=${rate.r_squared}` : ''}`
+        : '';
+      const proj = w.projection ?? null;
+      const confidenceLabel = {
+        high: 'High confidence', moderate: 'Moderate confidence',
+        low: 'Low confidence', insufficient_data: 'Insufficient data',
+      }[proj?.confidence ?? 'insufficient_data'];
+      const confidenceBadge = {
+        high: 'high', moderate: 'moderate',
+        low: 'low', insufficient_data: 'insufficient',
+      }[proj?.confidence ?? 'insufficient_data'];
+      const confounders = w.confounders ?? [];
+      return `
     <div class="card">
       <div class="card-header">Weight</div>
       <div class="stat-row">
@@ -195,20 +240,32 @@ function render(d) {
       </div>
       <div class="stat-row">
         <span class="stat-label">Weekly rate</span>
-        <span class="stat-value">${w.weekly_rate_lbs != null ? (w.weekly_rate_lbs > 0 ? '+' : '') + w.weekly_rate_lbs + ' lbs/wk' : '—'}</span>
+        <span class="stat-value">
+          ${rateText}
+          <span class="badge ${interpBadge}">${interpLabel}</span>
+        </span>
       </div>
-      ${w.projection ? `
+      ${bandText || basisText ? `
+      <div class="stat-sub">${[bandText, basisText].filter(Boolean).join(' · ')}</div>
+      ` : ''}
+      ${proj ? `
       <div class="stat-row">
         <span class="stat-label">Apr 30 projection</span>
-        <span class="stat-value">${w.projection.projected_at_deadline_lbs} lbs</span>
+        <span class="stat-value">
+          ${proj.projected_at_deadline_lbs} lbs
+          ${proj.projected_range_lbs ? `<span style="font-weight:400;color:var(--text-secondary);font-size:13px"> (${proj.projected_range_lbs[0]}–${proj.projected_range_lbs[1]})</span>` : ''}
+        </span>
       </div>
       <div class="stat-sub">
-        Target: ${w.projection.target_lbs} lbs
-        <span class="badge ${w.projection.on_track ? 'on-track' : 'behind'}">${w.projection.on_track ? 'On Track' : 'Behind'}</span>
+        Target: ${proj.target_lbs} lbs ·
+        <span class="badge ${confidenceBadge}">${confidenceLabel}</span>
+        ${proj.on_track == null ? '' : `<span class="badge ${proj.on_track ? 'on-track' : 'behind'}">${proj.on_track ? 'On Track' : 'Behind'}</span>`}
       </div>
       ` : ''}
+      ${confounders.map((c) => `<div class="confounder-note">${c.note}</div>`).join('')}
     </div>
-    ` : ''}
+      `;
+    })() : ''}
 
     <div class="card">
       <div class="card-header">Oura — Today</div>
